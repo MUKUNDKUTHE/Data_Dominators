@@ -1,2 +1,7 @@
+# run this from backend/ folder
+from dotenv import load_dotenv
+load_dotenv()
 from weather_service import get_weather
-print(get_weather("Nashik"))
+
+data = get_weather("Wardha")
+print(data)
