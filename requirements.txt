@@ -1,0 +1,18 @@
+# Core libraries for RAG (Retrieval-Augmented Generation) projects
+numpy
+pandas
+scikit-learn
+scipy
+matplotlib
+seaborn
+jupyter
+flask
+flask-cors
+openai
+requests
+pandas
+python-dotenv
+gunicorn
+#For web APIs or serving
+fastapi
+uvicorn
