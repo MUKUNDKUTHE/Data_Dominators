@@ -2,109 +2,185 @@
 
 import os
 from openai import OpenAI
+from dotenv import load_dotenv
 
-# Groq is OpenAI-compatible — just swap base_url
+load_dotenv()
+
+# ─────────────────────────────────────────
+# CLIENT SETUP
+# OpenAI SDK pointed at Groq's endpoint
+# To switch providers: change .env only
+# ─────────────────────────────────────────
 client = OpenAI(
-    api_key=os.getenv("GROQ_API_KEY"),
-    base_url="https://api.groq.com/openai/v1"
+    api_key  = os.getenv("GROQ_API_KEY"),
+    base_url = os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1")
 )
 
-LLM_MODEL = "llama-3.3-70b-versatile"
+LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
+
+SYSTEM_PROMPT = """You are AgriChain, an AI assistant helping Indian farmers 
+make better harvest and selling decisions.
+- Always respond in simple, clear English
+- Be direct and specific (use actual dates, prices, market names)
+- Always explain WHY you made each recommendation
+- Keep responses concise and under 150 words
+- Never use technical jargon
+- Be encouraging and trustworthy"""
 
 
+# ─────────────────────────────────────────
+# FUNCTION 1 — GENERATE RECOMMENDATION
+# Main function called by recommend.py route
+# ─────────────────────────────────────────
 def generate_recommendation(context: dict) -> str:
     """
-    Takes structured outputs from all models and returns
-    a plain-language farmer-friendly recommendation.
+    Generates plain language harvest + market recommendation.
+    Loads prompt from harvest_prompt.txt and fills in context.
     """
-    prompt = build_prompt(context)
+    prompt = _build_prompt("harvest_prompt.txt", context)
 
-    response = client.chat.completions.create(
-        model=LLM_MODEL,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are AgriChain, an AI assistant helping Indian farmers "
-                    "make better harvest and selling decisions. "
-                    "Always respond in simple, clear English. "
-                    "Be direct, specific, and trustworthy. "
-                    "Always explain WHY you made each recommendation. "
-                    "Keep responses under 150 words."
-                )
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-        temperature=0.3,
-        max_tokens=300
-    )
+    try:
+        response = client.chat.completions.create(
+            model    = LLM_MODEL,
+            messages = [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user",   "content": prompt}
+            ],
+            temperature = 0.3,
+            max_tokens  = 300
+        )
+        return response.choices[0].message.content
 
-    return response.choices[0].message.content
+    except Exception as e:
+        # Fallback — rule-based plain text if LLM fails
+        return _fallback_recommendation(context)
 
 
+# ─────────────────────────────────────────
+# FUNCTION 2 — GENERATE SPOILAGE ADVICE
+# Called by spoilage.py route
+# ─────────────────────────────────────────
 def generate_spoilage_advice(context: dict) -> str:
     """
-    Generates spoilage risk explanation and ranked preservation actions.
+    Generates plain language spoilage risk advice.
+    Loads prompt from spoilage_prompt.txt and fills in context.
     """
-    prompt = f"""
-    Crop: {context['crop']}
-    Storage type: {context['storage_type']}
-    Transit time: {context['transit_hours']} hours
-    Temperature: {context['temperature']}
-    Humidity: {context['humidity']}
-    Spoilage risk score: {context['spoilage_score']}/100
+    prompt = _build_prompt("spoilage_prompt.txt", context)
 
-    Give the farmer:
-    1. Spoilage risk level (Low / Medium / High)
-    2. Why this risk exists (1 sentence)
-    3. Top 3 preservation actions ranked cheapest first
-    """
-
-    response = client.chat.completions.create(
-        model=LLM_MODEL,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are AgriChain. Give practical, affordable preservation "
-                    "advice to Indian farmers with limited resources. "
-                    "Always rank actions cheapest first."
-                )
-            },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-        temperature=0.3,
-        max_tokens=200
-    )
-
-    return response.choices[0].message.content
-
-
-def build_prompt(context: dict) -> str:
-    """Loads prompt template and fills context values."""
     try:
-        with open("prompts/harvest_prompt.txt", "r") as f:
+        response = client.chat.completions.create(
+            model    = LLM_MODEL,
+            messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are AgriChain. Give practical, affordable preservation "
+                        "advice to Indian farmers with limited resources. "
+                        "Always rank actions cheapest first. Keep under 120 words."
+                    )
+                },
+                {"role": "user", "content": prompt}
+            ],
+            temperature = 0.3,
+            max_tokens  = 200
+        )
+        return response.choices[0].message.content
+
+    except Exception as e:
+        return _fallback_spoilage(context)
+
+
+# ─────────────────────────────────────────
+# HELPER — BUILD PROMPT FROM FILE
+# ─────────────────────────────────────────
+def _build_prompt(filename: str, context: dict) -> str:
+    """
+    Loads prompt template from prompts/ folder
+    and fills in context values.
+    Falls back to inline prompt if file missing.
+    """
+    BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
+    PROMPTS_DIR  = os.path.join(BASE_DIR, "../prompts")
+    prompt_path  = os.path.join(PROMPTS_DIR, filename)
+
+    try:
+        with open(prompt_path, "r") as f:
             template = f.read()
         return template.format(**context)
     except FileNotFoundError:
-        return f"""
-        Crop: {context.get('crop')}
-        Location: {context.get('state')}
-        Predicted price: ₹{context.get('predicted_price')}/quintal
-        Price trend: {context.get('price_trend')}
-        Best market: {context.get('best_market')}
-        Harvest window: {context.get('harvest_window')}
-        Weather: {context.get('weather')}
-        Spoilage risk: {context.get('spoilage_risk')}
-        Preservation actions: {context.get('preservation_actions')}
+        # Fallback inline prompt
+        return _inline_prompt(filename, context)
+    except KeyError as e:
+        # Missing key in context — use what we have
+        print(f"⚠️ Prompt key missing: {e}. Using partial context.")
+        return _inline_prompt(filename, context)
 
-        Give the farmer a clear recommendation.
-        Tell them WHEN to harvest, WHERE to sell, and WHY.
-        Mention spoilage risk if Medium or High.
+
+def _inline_prompt(filename: str, context: dict) -> str:
+    """Fallback inline prompts if files not found."""
+    if "harvest" in filename:
+        return f"""
+        Farmer's crop    : {context.get('crop', 'Unknown')}
+        Location         : {context.get('district', '')}, {context.get('state', '')}
+        Predicted price  : ₹{context.get('predicted_price', 'N/A')}/quintal
+        Price trend      : {context.get('price_trend', 'stable')}
+        Best market      : {context.get('best_market', 'local market')}
+        Harvest window   : {context.get('harvest_window', 'this week')}
+        Weather          : {context.get('weather', 'normal')}
+        Spoilage risk    : {context.get('spoilage_risk', 'Low')}
+        Days safe        : {context.get('days_safe', 7)} days
+
+        Give the farmer: WHEN to harvest, WHERE to sell, WHAT price to expect,
+        and ONE urgent action. Explain WHY. Under 150 words.
         """
+    else:
+        return f"""
+        Crop         : {context.get('crop', 'Unknown')}
+        Storage      : {context.get('storage_type', 'basic_shed')}
+        Transit      : {context.get('transit_hours', 6)} hours
+        Temperature  : {context.get('temperature', '30°C')}
+        Humidity     : {context.get('humidity', '65%')}
+        Risk score   : {context.get('spoilage_score', 50)}/100
+
+        Give: risk level, days safe, top 3 cheapest preservation actions.
+        Under 120 words.
+        """
+
+
+# ─────────────────────────────────────────
+# FALLBACK — Rule-based output if LLM fails
+# Ensures demo never crashes
+# ─────────────────────────────────────────
+def _fallback_recommendation(context: dict) -> str:
+    crop         = context.get("crop", "your crop")
+    best_market  = context.get("best_market", "nearest market")
+    price        = context.get("predicted_price", "N/A")
+    trend        = context.get("price_trend", "stable")
+    spoilage     = context.get("spoilage_risk", "Low")
+    days         = context.get("days_safe", 7)
+    harvest_day  = context.get("best_harvest_day", "soon")
+
+    msg = (
+        f"Harvest {crop} around {harvest_day} when weather conditions are best. "
+        f"Sell at {best_market} where prices average ₹{price}/quintal. "
+        f"Price trend is currently {trend}. "
+    )
+    if spoilage in ["Medium", "High"]:
+        msg += (f"⚠️ {spoilage} spoilage risk — sell within {days} days. "
+                f"Store in shade and improve ventilation immediately.")
+    else:
+        msg += f"Low spoilage risk — you have {days} days to sell comfortably."
+
+    return msg
+
+
+def _fallback_spoilage(context: dict) -> str:
+    crop  = context.get("crop", "your crop")
+    score = context.get("spoilage_score", 50)
+    risk  = "High" if score >= 65 else "Medium" if score >= 35 else "Low"
+    return (
+        f"{risk} spoilage risk for {crop} (score: {score}/100). "
+        f"Actions: 1) Sort damaged produce (Free) "
+        f"2) Move to shade (Free) "
+        f"3) Use jute sacks (₹5-10/bag)"
+    )
