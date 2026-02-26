@@ -1,6 +1,6 @@
 # backend/services/crop_service.py
 #
-# Dataset: Plant_Parameters.csv (100,000 rows, 10 crops)
+# Dataset: Plant_Parameters.csv (100,000 rows, 70+ crops)
 # Columns: pH, Soil EC, Phosphorus, Potassium,
 #          Urea, T.S.P, M.O.P, Moisture, Temperature, Plant Type
 #
@@ -16,70 +16,23 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 
+
+from services.crop_profiles import (
+    CROP_PROFILES,
+    CROP_TO_DATASET_MAP,
+    get_crop_profile,
+    get_model_crop
+)
+
+# DELETE the old CROP_PROFILES dict from crop_service.py
 warnings.filterwarnings("ignore")
 
-
 # PATHS
-
 BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 # FIXED — works on Windows too
 DATA_PATH    = os.path.join(BASE_DIR, "..", "data", "soil", "Plant_Parameters.csv")
 MODEL_PATH   = os.path.join(BASE_DIR, "..", "models", "crop_suitability_model.pkl")
 ENCODER_PATH = os.path.join(BASE_DIR, "..", "models", "crop_label_encoder.pkl")
-
-
-
-# CROP PROFILES — Spoilage rules per crop
-# Covers all 10 dataset crops + common mandi crops
-
-CROP_PROFILES = {
-    "Tomato":       {"shelf_life_days": 7,   "ideal_temp": 15, "ideal_humidity": 60,
-                     "storage_tip": "Store in cool dry place. Avoid direct sunlight.",
-                     "spoilage_notes": "Highly perishable. Sell within 3-5 days."},
-    "Chili":        {"shelf_life_days": 14,  "ideal_temp": 8,  "ideal_humidity": 90,
-                     "storage_tip": "Refrigerate in perforated bags. Keep dry.",
-                     "spoilage_notes": "Moderate shelf life. Dry chili lasts much longer."},
-    "Carrots":      {"shelf_life_days": 30,  "ideal_temp": 0,  "ideal_humidity": 95,
-                     "storage_tip": "Remove tops, store in cool humid conditions.",
-                     "spoilage_notes": "Good shelf life if stored properly."},
-    "Eggplant":     {"shelf_life_days": 7,   "ideal_temp": 10, "ideal_humidity": 85,
-                     "storage_tip": "Store at room temperature. Do not refrigerate below 10°C.",
-                     "spoilage_notes": "Perishable. Sensitive to cold damage."},
-    "Corn":         {"shelf_life_days": 3,   "ideal_temp": 0,  "ideal_humidity": 95,
-                     "storage_tip": "Keep husked, refrigerate immediately after harvest.",
-                     "spoilage_notes": "Very perishable fresh. Dry corn lasts longer."},
-    "Rice":         {"shelf_life_days": 365, "ideal_temp": 20, "ideal_humidity": 40,
-                     "storage_tip": "Store in airtight containers in dry place.",
-                     "spoilage_notes": "Excellent shelf life when dry."},
-    "Wheat":        {"shelf_life_days": 365, "ideal_temp": 20, "ideal_humidity": 40,
-                     "storage_tip": "Store in clean, dry, ventilated warehouse.",
-                     "spoilage_notes": "Excellent shelf life when moisture below 14%."},
-    "Cinnamon":     {"shelf_life_days": 730, "ideal_temp": 20, "ideal_humidity": 40,
-                     "storage_tip": "Store in airtight container away from light.",
-                     "spoilage_notes": "Very long shelf life as dried spice."},
-    "Strawberries": {"shelf_life_days": 3,   "ideal_temp": 0,  "ideal_humidity": 90,
-                     "storage_tip": "Refrigerate immediately. Don't wash until use.",
-                     "spoilage_notes": "Extremely perishable. Sell within 1-2 days."},
-    "Sunflowers":   {"shelf_life_days": 180, "ideal_temp": 15, "ideal_humidity": 40,
-                     "storage_tip": "Store seeds in cool dry place.",
-                     "spoilage_notes": "Seeds have good shelf life when dry."},
-    "Onion":        {"shelf_life_days": 30,  "ideal_temp": 10, "ideal_humidity": 50,
-                     "storage_tip": "Store in dry, ventilated area. Avoid moisture.",
-                     "spoilage_notes": "Good shelf life. Keep dry and ventilated."},
-    "Potato":       {"shelf_life_days": 30,  "ideal_temp": 8,  "ideal_humidity": 85,
-                     "storage_tip": "Store in dark, cool cellar. Avoid light.",
-                     "spoilage_notes": "Good shelf life when stored in dark."},
-    "Banana":       {"shelf_life_days": 5,   "ideal_temp": 13, "ideal_humidity": 85,
-                     "storage_tip": "Keep at room temp. Do not refrigerate unripe.",
-                     "spoilage_notes": "Perishable. Sell within 3-5 days of ripening."},
-    "Mango":        {"shelf_life_days": 7,   "ideal_temp": 12, "ideal_humidity": 85,
-                     "storage_tip": "Store at 12-13°C. Handle gently.",
-                     "spoilage_notes": "Perishable. Handle with care to avoid bruising."},
-    "Default":      {"shelf_life_days": 7,   "ideal_temp": 15, "ideal_humidity": 60,
-                     "storage_tip": "Store in cool, dry, ventilated area.",
-                     "spoilage_notes": "Follow standard post-harvest practices."}
-}
-
 
 
 # MICRONUTRIENT DEFICIENCY DATA
@@ -187,28 +140,40 @@ def check_crop_suitability(
     if clf is None:
         return {"error": "Crop model unavailable. Check Plant_Parameters.csv"}
 
-    features      = pd.DataFrame([[ph, soil_ec, phosphorus, potassium,
-                                    urea, tsp, mop, moisture, temperature]],
-                                  columns=["pH", "Soil EC", "Phosphorus", "Potassium",
-                                           "Urea", "T.S.P", "M.O.P", "Moisture", "Temperature"])
+    features = pd.DataFrame([[ph, soil_ec, phosphorus, potassium,
+                               urea, tsp, mop, moisture, temperature]],
+                             columns=["pH", "Soil EC", "Phosphorus", "Potassium",
+                                      "Urea", "T.S.P", "M.O.P", "Moisture", "Temperature"])
+
+    # ── Map farmer's crop to nearest ML model crop ──
+    # ML model only knows 10 crops from dataset
+    # get_model_crop() maps any of 78 crops to nearest equivalent
+    crop_for_model = get_model_crop(crop)
+
+    # ── Get model's prediction using mapped crop ──
     probabilities = clf.predict_proba(features)[0]
     top3_indices  = np.argsort(probabilities)[::-1][:3]
     top3_crops    = encoder.inverse_transform(top3_indices)
     top3_probs    = probabilities[top3_indices]
 
-    crop_lower    = crop.strip().lower()
+    # ── Check suitability against MAPPED crop (not original) ──
+    # Example: Onion → mapped to Carrots for model check
+    mapped_lower  = crop_for_model.strip().lower()
     top3_lower    = [c.lower() for c in top3_crops]
-    is_suitable   = crop_lower in top3_lower
+    is_suitable   = mapped_lower in top3_lower
     best_crop     = top3_crops[0].title()
 
-    if crop_lower in top3_lower:
-        idx               = top3_lower.index(crop_lower)
+    # ── Calculate confidence ──
+    if mapped_lower in top3_lower:
+        idx               = top3_lower.index(mapped_lower)
         confidence        = round(float(top3_probs[idx]) * 100, 1)
         suitability_score = min(100, int(confidence * 1.1))
     else:
         confidence        = round(float(top3_probs[0]) * 100, 1)
         suitability_score = max(10, int(confidence * 0.25))
 
+    # ── Plain language reason ──
+    # Always show ORIGINAL crop name to farmer (not mapped name)
     if is_suitable and confidence > 60:
         reason = (f"Soil conditions are well suited for {crop.title()}. "
                   f"pH {ph}, Moisture {moisture}%, match {crop.title()} requirements.")
@@ -220,16 +185,16 @@ def check_crop_suitability(
                   f"pH {ph} and EC {soil_ec} may limit {crop.title()} yield.")
 
     return {
-        "crop":             crop.title(),
-        "is_suitable":      is_suitable,
+        "crop":              crop.title(),           # original crop name
+        "model_crop_used":   crop_for_model,         # mapped crop (for transparency)
+        "is_suitable":       is_suitable,
         "suitability_score": suitability_score,
-        "confidence":       confidence,
-        "recommended_crop": best_crop,
-        "top_3_crops":      [c.title() for c in top3_crops],
-        "top_3_confidence": [round(float(p) * 100, 1) for p in top3_probs],
-        "reason":           reason
+        "confidence":        confidence,
+        "recommended_crop":  best_crop,
+        "top_3_crops":       [c.title() for c in top3_crops],
+        "top_3_confidence":  [round(float(p) * 100, 1) for p in top3_probs],
+        "reason":            reason
     }
-
 
 
 # FUNCTION 2 — MICRONUTRIENT WARNINGS
@@ -294,7 +259,7 @@ def get_spoilage_risk(
 ) -> dict:
 
     crop_title     = crop.strip().title()
-    profile        = CROP_PROFILES.get(crop_title, CROP_PROFILES["Default"])
+    profile = get_crop_profile(crop_title)
     shelf_life     = profile["shelf_life_days"]
 
     storage_scores = {"cold_storage": 0.1, "cool_storage": 0.3,
