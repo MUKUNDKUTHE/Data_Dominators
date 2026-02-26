@@ -126,8 +126,6 @@ def _load_model():
 
 clf, encoder = _load_model()
 
-
-
 # FUNCTION 1 — CROP SUITABILITY
 
 def check_crop_suitability(
