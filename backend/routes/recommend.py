@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
 import sys, os, requests
+from py_olamaps.OlaMaps import OlaMaps
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -21,12 +22,7 @@ router = APIRouter()
 
 
 # OLA MAPS CONFIG
-
-OLA_MAPS_API_KEY   = os.getenv("OLA_MAPS_API_KEY")
-OLA_DIRECTIONS_URL = "https://api.olamaps.io/routing/v1/directions"
-OLA_GEOCODE_URL    = "https://api.olamaps.io/places/v1/geocode"
-
-
+OLA_MAPS_API_KEY = os.getenv("OLA_MAPS_API_KEY")
 
 # REQUEST MODEL
 
@@ -65,8 +61,6 @@ class RecommendRequest(BaseModel):
         description="Hours to market. Set 0 to auto-calculate via OLA Maps."
     )
 
-
-
 # RESPONSE MODEL
 
 class RecommendResponse(BaseModel):
@@ -83,29 +77,6 @@ class RecommendResponse(BaseModel):
     spoilage:         dict
     transit_info:     dict
 
-
-
-# OLA MAPS — GEOCODE LOCATION
-
-def geocode_location(location: str) -> Optional[dict]:
-    if not OLA_MAPS_API_KEY:
-        return None
-    try:
-        response = requests.get(
-            OLA_GEOCODE_URL,
-            params={"address": f"{location}, India", "api_key": OLA_MAPS_API_KEY},
-            timeout=5
-        )
-        data = response.json()
-        if data.get("geocodingResults"):
-            loc = data["geocodingResults"][0]["geometry"]["location"]
-            return {"lat": loc["lat"], "lon": loc["lng"]}
-    except Exception as e:
-        print(f"⚠️ OLA geocode failed: {e}")
-    return None
-
-
-
 # OLA MAPS — GET TRANSIT TIME
 # Returns real driving time between
 # farmer district and best market
@@ -117,7 +88,8 @@ def get_transit_time_ola(
     dest_state:      str
 ) -> dict:
     """
-    Calculates real driving time using OLA Maps Directions API.
+    Calculates real driving time using OLA Maps.
+    Uses py_olamaps library to avoid URL encoding bugs.
     Falls back to 6hr default if API unavailable.
     """
     default_result = {
@@ -132,33 +104,23 @@ def get_transit_time_ola(
         return default_result
 
     try:
-        # Get coordinates — OLA Maps first, fallback to OpenWeather geocoding
-        origin_coords = geocode_location(f"{origin_district}, {origin_state}") or \
-                        get_coordinates(origin_district, origin_state)
-        dest_coords   = geocode_location(f"{dest_market}, {dest_state}") or \
-                        get_coordinates(dest_market, dest_state)
+        # Get coordinates using OpenWeather geocoding
+        # (already working and tested)
+        origin_coords = get_coordinates(origin_district, origin_state)
+        dest_coords   = get_coordinates(dest_market, dest_state)
 
-        if not origin_coords or not dest_coords:
-            return default_result
-
+        # Format as "lat,lon" strings
         origin_str = f"{origin_coords['lat']},{origin_coords['lon']}"
         dest_str   = f"{dest_coords['lat']},{dest_coords['lon']}"
 
-        # Call OLA Directions API
-        response = requests.get(
-            OLA_DIRECTIONS_URL,
-            params={
-                "origin":      origin_str,
-                "destination": dest_str,
-                "api_key":     OLA_MAPS_API_KEY
-            },
-            timeout=10
-        )
-        response.raise_for_status()
-        data = response.json()
+        # Use py_olamaps library — handles auth + URL encoding correctly
+        client = OlaMaps(api_key=OLA_MAPS_API_KEY)
+        result = client.routing.directions(origin_str, dest_str)
 
-        routes = data.get("routes", [])
+        # Extract duration and distance from response
+        routes = result.get("routes", [])
         if not routes:
+            print("⚠️ OLA Maps returned no routes. Using default.")
             return default_result
 
         leg             = routes[0]["legs"][0]
@@ -185,13 +147,9 @@ def get_transit_time_ola(
             "route_summary":  summary
         }
 
-    except requests.exceptions.RequestException as e:
-        print(f"⚠️ OLA Maps API error: {e}. Using default.")
-        return default_result
     except Exception as e:
-        print(f"⚠️ Transit error: {e}. Using default.")
+        print(f"⚠️ OLA Maps error: {e}. Using default.")
         return default_result
-
 
 
 # MAIN ENDPOINT

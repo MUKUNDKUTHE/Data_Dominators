@@ -6,21 +6,21 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
+# ─────────────────────────────────────────
 # CONFIG
 # Free tier: 60 calls/min, no credit card needed
 # Uses Current Weather API (free) + 5-day Forecast API (free)
-
+# ─────────────────────────────────────────
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 BASE_URL_CURRENT    = "https://api.openweathermap.org/data/2.5/weather"
 BASE_URL_FORECAST   = "https://api.openweathermap.org/data/2.5/forecast"
 BASE_URL_GEO        = "http://api.openweathermap.org/geo/1.0/direct"
 
-
+# ─────────────────────────────────────────
 # INDIA STATE → COORDINATES MAP
 # Fallback if geocoding fails
 # Covers all major mandi states
-
+# ─────────────────────────────────────────
 STATE_COORDINATES = {
     "Andhra Pradesh":       {"lat": 15.9129,  "lon": 79.7400},
     "Arunachal Pradesh":    {"lat": 28.2180,  "lon": 94.7278},
@@ -55,47 +55,17 @@ STATE_COORDINATES = {
 }
 
 
-
+# ─────────────────────────────────────────
 # HELPER — GET COORDINATES
-# Tries geocoding first, falls back to state map
-# weather_service.py — add this function
-
-def get_transit_time(
-    origin_district: str,
-    origin_state:    str,
-    dest_market:     str,
-    dest_state:      str,
-    ola_api_key:     str
-) -> float:
-    """
-    Returns estimated transit time in hours
-    using OLA Maps Directions API
-    """
-    origin = f"{origin_district}, {origin_state}, India"
-    dest   = f"{dest_market}, {dest_state}, India"
-
-    url = "https://api.olamaps.io/routing/v1/directions"
-
-    response = requests.get(url, params={
-        "origin":      origin,
-        "destination": dest,
-        "api_key":     ola_api_key
-    })
-
-    data = response.json()
-
-    # Extract duration in seconds → convert to hours
-    duration_seconds = data["routes"][0]["legs"][0]["duration"]
-    transit_hours    = round(duration_seconds / 3600, 1)
-
-    return transit_hours
-
-
-
+# Tries OpenWeather geocoding first,
+# falls back to state coordinates map
+# Also used by recommend.py for OLA Maps
+# ─────────────────────────────────────────
 def get_coordinates(city: str, state: str) -> dict:
     """
     Gets lat/lon for a city+state combination.
     Tries OpenWeather geocoding first, falls back to state center.
+    Called by both weather functions AND recommend.py OLA Maps logic.
     """
     try:
         response = requests.get(
@@ -122,10 +92,10 @@ def get_coordinates(city: str, state: str) -> dict:
     return {"lat": 20.5937, "lon": 78.9629}
 
 
-
+# ─────────────────────────────────────────
 # HELPER — INTERPRET WEATHER FOR FARMING
 # Converts raw weather data into farming signals
-
+# ─────────────────────────────────────────
 def interpret_weather(temp: float, humidity: float,
                       rainfall: float, wind_speed: float) -> dict:
     """
@@ -137,7 +107,6 @@ def interpret_weather(temp: float, humidity: float,
         spoilage_factor : multiplier for spoilage calculation (1.0 = normal)
         summary         : plain language weather summary
     """
-
     issues = []
 
     # Temperature analysis
@@ -178,9 +147,7 @@ def interpret_weather(temp: float, humidity: float,
         wind_risk = "Low"
 
     # Overall harvest risk
-    risk_scores = {
-        "Low": 1, "Medium": 2, "High": 3
-    }
+    risk_scores = {"Low": 1, "Medium": 2, "High": 3}
     avg_risk = (
         risk_scores[temp_risk] +
         risk_scores[humidity_risk] +
@@ -197,17 +164,17 @@ def interpret_weather(temp: float, humidity: float,
         harvest_risk = "Low"
         transit_risk = "Low"
 
-    # Spoilage factor — multiplier used by spoilage_service
+    # Spoilage factor — multiplier used by crop_service spoilage logic
     # High heat + humidity = faster spoilage
     spoilage_factor = round(1.0 + (avg_risk - 1) * 0.3, 2)
 
     # Plain language summary
     if issues:
-        summary = f"Weather concern: {', '.join(issues)}. " \
-                  f"Harvest risk is {harvest_risk.lower()}."
+        summary = (f"Weather concern: {', '.join(issues)}. "
+                   f"Harvest risk is {harvest_risk.lower()}.")
     else:
-        summary = f"Weather conditions are favorable. " \
-                  f"Good time to harvest and transport."
+        summary = ("Weather conditions are favorable. "
+                   "Good time to harvest and transport.")
 
     return {
         "harvest_risk":    harvest_risk,
@@ -218,10 +185,10 @@ def interpret_weather(temp: float, humidity: float,
     }
 
 
-
+# ─────────────────────────────────────────
 # FUNCTION 1 — GET CURRENT WEATHER
 # Returns current conditions for a location
-
+# ─────────────────────────────────────────
 def get_current_weather(city: str, state: str) -> dict:
     """
     Gets current weather for a city/state in India.
@@ -230,7 +197,6 @@ def get_current_weather(city: str, state: str) -> dict:
         temperature, humidity, rainfall, wind_speed,
         weather_description, farming signals
     """
-
     if not OPENWEATHER_API_KEY:
         return _mock_weather(city, state)
 
@@ -259,18 +225,18 @@ def get_current_weather(city: str, state: str) -> dict:
         signals = interpret_weather(temp, humidity, rainfall, wind_speed)
 
         return {
-            "city":               city.title(),
-            "state":              state.title(),
-            "temperature":        round(temp, 1),
-            "humidity":           humidity,
-            "rainfall_mm":        rainfall,
-            "wind_speed_ms":      round(wind_speed, 1),
-            "description":        description,
-            "harvest_risk":       signals["harvest_risk"],
-            "transit_risk":       signals["transit_risk"],
-            "spoilage_factor":    signals["spoilage_factor"],
-            "weather_summary":    signals["summary"],
-            "source":             "live"
+            "city":            city.title(),
+            "state":           state.title(),
+            "temperature":     round(temp, 1),
+            "humidity":        humidity,
+            "rainfall_mm":     rainfall,
+            "wind_speed_ms":   round(wind_speed, 1),
+            "description":     description,
+            "harvest_risk":    signals["harvest_risk"],
+            "transit_risk":    signals["transit_risk"],
+            "spoilage_factor": signals["spoilage_factor"],
+            "weather_summary": signals["summary"],
+            "source":          "live"
         }
 
     except requests.exceptions.RequestException as e:
@@ -278,18 +244,15 @@ def get_current_weather(city: str, state: str) -> dict:
         return _mock_weather(city, state)
 
 
-
+# ─────────────────────────────────────────
 # FUNCTION 2 — GET 5-DAY FORECAST SUMMARY
 # Returns weather outlook for harvest planning
-
+# ─────────────────────────────────────────
 def get_weather_forecast(city: str, state: str, days: int = 5) -> dict:
     """
     Gets 5-day weather forecast summary for harvest window planning.
-
-    Returns:
-        daily forecast with farming risk per day
+    Returns daily forecast with farming risk per day.
     """
-
     if not OPENWEATHER_API_KEY:
         return _mock_forecast(city, state)
 
@@ -335,13 +298,13 @@ def get_weather_forecast(city: str, state: str, days: int = 5) -> dict:
                                         total_rain, avg_wind)
 
             forecast_days.append({
-                "date":           date,
-                "temperature":    avg_temp,
-                "humidity":       avg_humidity,
-                "rainfall_mm":    total_rain,
-                "harvest_risk":   signals["harvest_risk"],
-                "transit_risk":   signals["transit_risk"],
-                "summary":        signals["summary"]
+                "date":         date,
+                "temperature":  avg_temp,
+                "humidity":     avg_humidity,
+                "rainfall_mm":  total_rain,
+                "harvest_risk": signals["harvest_risk"],
+                "transit_risk": signals["transit_risk"],
+                "summary":      signals["summary"]
             })
 
         # Find best harvest day (lowest risk)
@@ -356,8 +319,8 @@ def get_weather_forecast(city: str, state: str, days: int = 5) -> dict:
             "forecast":      forecast_days,
             "best_day":      best_day["date"],
             "best_day_risk": best_day["harvest_risk"],
-            "summary":       f"Best day to harvest/transport: {best_day['date']} "
-                             f"({best_day['harvest_risk']} risk)",
+            "summary":       (f"Best day to harvest/transport: {best_day['date']} "
+                              f"({best_day['harvest_risk']} risk)"),
             "source":        "live"
         }
 
@@ -366,10 +329,10 @@ def get_weather_forecast(city: str, state: str, days: int = 5) -> dict:
         return _mock_forecast(city, state)
 
 
-
+# ─────────────────────────────────────────
 # FUNCTION 3 — GET FULL WEATHER INSIGHT
 # Master function called by recommend route
-
+# ─────────────────────────────────────────
 def get_weather_insight(city: str, state: str) -> dict:
     """
     Master function — combines current weather + forecast.
@@ -384,11 +347,11 @@ def get_weather_insight(city: str, state: str) -> dict:
     }
 
 
-
+# ─────────────────────────────────────────
 # MOCK DATA
 # Used when API key is missing or API fails
 # Ensures demo works even without API key
-
+# ─────────────────────────────────────────
 def _mock_weather(city: str, state: str) -> dict:
     return {
         "city":            city.title(),
@@ -408,7 +371,7 @@ def _mock_weather(city: str, state: str) -> dict:
 
 def _mock_forecast(city: str, state: str) -> dict:
     from datetime import datetime, timedelta
-    today = datetime.today()
+    today         = datetime.today()
     forecast_days = []
     for i in range(5):
         day = today + timedelta(days=i)
@@ -432,9 +395,9 @@ def _mock_forecast(city: str, state: str) -> dict:
     }
 
 
-
+# ─────────────────────────────────────────
 # QUICK TEST — python weather_service.py
-
+# ─────────────────────────────────────────
 if __name__ == "__main__":
     print("\n" + "=" * 50)
     print("  Testing Weather Service")
