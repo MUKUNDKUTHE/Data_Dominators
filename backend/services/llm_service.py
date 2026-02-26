@@ -100,7 +100,7 @@ def _build_prompt(filename: str, context: dict) -> str:
     Falls back to inline prompt if file missing.
     """
     BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
-    PROMPTS_DIR  = os.path.join(BASE_DIR, "../prompts")
+    PROMPTS_DIR  = os.path.join(BASE_DIR, "../prompt")
     prompt_path  = os.path.join(PROMPTS_DIR, filename)
 
     try:
