@@ -19,17 +19,17 @@ from services.llm_service     import generate_recommendation
 
 router = APIRouter()
 
-# ─────────────────────────────────────────
+
 # OLA MAPS CONFIG
-# ─────────────────────────────────────────
+
 OLA_MAPS_API_KEY   = os.getenv("OLA_MAPS_API_KEY")
 OLA_DIRECTIONS_URL = "https://api.olamaps.io/routing/v1/directions"
 OLA_GEOCODE_URL    = "https://api.olamaps.io/places/v1/geocode"
 
 
-# ─────────────────────────────────────────
+
 # REQUEST MODEL
-# ─────────────────────────────────────────
+
 class RecommendRequest(BaseModel):
     # Crop info
     crop:     str = Field(...,              example="Tomato")
@@ -66,9 +66,9 @@ class RecommendRequest(BaseModel):
     )
 
 
-# ─────────────────────────────────────────
+
 # RESPONSE MODEL
-# ─────────────────────────────────────────
+
 class RecommendResponse(BaseModel):
     success:          bool
     crop:             str
@@ -84,9 +84,9 @@ class RecommendResponse(BaseModel):
     transit_info:     dict
 
 
-# ─────────────────────────────────────────
+
 # OLA MAPS — GEOCODE LOCATION
-# ─────────────────────────────────────────
+
 def geocode_location(location: str) -> Optional[dict]:
     if not OLA_MAPS_API_KEY:
         return None
@@ -105,11 +105,11 @@ def geocode_location(location: str) -> Optional[dict]:
     return None
 
 
-# ─────────────────────────────────────────
+
 # OLA MAPS — GET TRANSIT TIME
 # Returns real driving time between
 # farmer district and best market
-# ─────────────────────────────────────────
+
 def get_transit_time_ola(
     origin_district: str,
     origin_state:    str,
@@ -193,10 +193,10 @@ def get_transit_time_ola(
         return default_result
 
 
-# ─────────────────────────────────────────
+
 # MAIN ENDPOINT
 # POST /api/recommend
-# ─────────────────────────────────────────
+
 @router.post("/recommend", response_model=RecommendResponse)
 async def recommend(request: RecommendRequest):
     """
@@ -322,10 +322,10 @@ async def recommend(request: RecommendRequest):
         )
 
 
-# ─────────────────────────────────────────
+
 # QUICK PRICE ENDPOINT
 # GET /api/price
-# ─────────────────────────────────────────
+
 @router.get("/price")
 async def quick_price(
     crop: str, state: str, district: str,
@@ -342,10 +342,10 @@ async def quick_price(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ─────────────────────────────────────────
+
 # TRANSIT TIME ENDPOINT
 # GET /api/transit?origin=Pune&state=Maharashtra&dest=Panvel+APMC
-# ─────────────────────────────────────────
+
 @router.get("/transit")
 async def transit(origin: str, state: str, dest: str):
     """Returns live transit time between farmer location and market."""
