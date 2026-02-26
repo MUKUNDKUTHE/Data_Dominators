@@ -1,0 +1,159 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Noto+Sans+Telugu:wght@400;500;700&family=Noto+Sans+Tamil:wght@400;500;700&family=Noto+Sans+Kannada:wght@400;500;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 50 87% 94%;
+    --foreground: 150 43% 15%;
+
+    --card: 50 60% 97%;
+    --card-foreground: 150 43% 15%;
+
+    --popover: 50 60% 97%;
+    --popover-foreground: 150 43% 15%;
+
+    --primary: 153 43% 30%;
+    --primary-foreground: 50 87% 94%;
+
+    --secondary: 29 89% 67%;
+    --secondary-foreground: 150 43% 15%;
+
+    --muted: 50 30% 88%;
+    --muted-foreground: 150 20% 40%;
+
+    --accent: 25 76% 31%;
+    --accent-foreground: 50 87% 94%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 50 30% 82%;
+    --input: 50 30% 82%;
+    --ring: 153 43% 30%;
+
+    --radius: 1rem;
+
+    --hero-gradient: linear-gradient(135deg, hsl(153 43% 30%), hsl(152 56% 12%));
+    --golden-gradient: linear-gradient(135deg, hsl(29 89% 67%), hsl(36 100% 50%));
+    --card-shadow: 0 2px 12px -2px hsl(153 43% 30% / 0.1);
+    --card-shadow-lg: 0 8px 30px -4px hsl(153 43% 30% / 0.15);
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 152 56% 6%;
+    --foreground: 50 87% 94%;
+
+    --card: 152 40% 10%;
+    --card-foreground: 50 87% 94%;
+
+    --popover: 152 40% 10%;
+    --popover-foreground: 50 87% 94%;
+
+    --primary: 29 89% 67%;
+    --primary-foreground: 152 56% 6%;
+
+    --secondary: 153 43% 30%;
+    --secondary-foreground: 50 87% 94%;
+
+    --muted: 152 30% 15%;
+    --muted-foreground: 50 30% 65%;
+
+    --accent: 25 76% 31%;
+    --accent-foreground: 50 87% 94%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 152 30% 18%;
+    --input: 152 30% 18%;
+    --ring: 29 89% 67%;
+
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Noto Sans', 'Noto Sans Devanagari', 'Noto Sans Telugu', 'Noto Sans Tamil', 'Noto Sans Kannada', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+
+  html {
+    font-size: 16px;
+  }
+}
+
+@layer utilities {
+  .text-agri-body {
+    @apply text-base leading-relaxed;
+    font-size: 1.125rem;
+  }
+
+  .text-agri-label {
+    @apply text-sm font-medium;
+  }
+
+  .text-agri-heading {
+    @apply text-2xl font-bold tracking-tight;
+  }
+
+  .text-agri-hero {
+    @apply text-3xl font-extrabold tracking-tight;
+  }
+
+  .card-agri {
+    @apply rounded-2xl p-4;
+    box-shadow: var(--card-shadow);
+  }
+
+  .card-agri-lg {
+    @apply rounded-2xl p-5;
+    box-shadow: var(--card-shadow-lg);
+  }
+
+  .gradient-hero {
+    background: var(--hero-gradient);
+  }
+
+  .gradient-golden {
+    background: var(--golden-gradient);
+  }
+
+  .btn-press {
+    @apply transition-transform duration-100 active:scale-95;
+  }
+
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .tap-target {
+    @apply min-h-[48px] min-w-[48px];
+  }
+}
