@@ -58,6 +58,39 @@ STATE_COORDINATES = {
 
 # HELPER — GET COORDINATES
 # Tries geocoding first, falls back to state map
+# weather_service.py — add this function
+
+def get_transit_time(
+    origin_district: str,
+    origin_state:    str,
+    dest_market:     str,
+    dest_state:      str,
+    ola_api_key:     str
+) -> float:
+    """
+    Returns estimated transit time in hours
+    using OLA Maps Directions API
+    """
+    origin = f"{origin_district}, {origin_state}, India"
+    dest   = f"{dest_market}, {dest_state}, India"
+
+    url = "https://api.olamaps.io/routing/v1/directions"
+
+    response = requests.get(url, params={
+        "origin":      origin,
+        "destination": dest,
+        "api_key":     ola_api_key
+    })
+
+    data = response.json()
+
+    # Extract duration in seconds → convert to hours
+    duration_seconds = data["routes"][0]["legs"][0]["duration"]
+    transit_hours    = round(duration_seconds / 3600, 1)
+
+    return transit_hours
+
+
 
 def get_coordinates(city: str, state: str) -> dict:
     """
