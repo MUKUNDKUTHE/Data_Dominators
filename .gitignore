@@ -34,3 +34,16 @@ Thumbs.db
 *.pem
 *.key
 secrets.json
+
+# .gitignore
+backend/data/raw/*.csv
+backend/data/processed/*.csv
+backend/data/soil/*.csv
+backend/models/*.cbm
+
+*.tsv
+*.tfevents
+*.pkl
+__init__.py
+
+/catboost_info
