@@ -16,3 +16,4 @@ gunicorn
 #For web APIs or serving
 fastapi
 uvicorn
+catboost    
