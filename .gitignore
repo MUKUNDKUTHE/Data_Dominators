@@ -47,3 +47,30 @@ backend/models/*.cbm
 __init__.py
 
 /catboost_info
+# Frontend (React + Vite)
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+frontend/.vite/
+frontend/coverage/
+frontend/bun.lockb
+frontend/*.log
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+frontend/lerna-debug.log*
+frontend/.turbo/
+frontend/storybook-static/
+
+# Mobile (Expo)
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/.env
+
+# Legacy typo folder
+fontend/node_modules/
