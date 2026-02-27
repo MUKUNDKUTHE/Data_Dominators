@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 import sys
 import os
+import math
 from dotenv import load_dotenv
 from py_olamaps.OlaMaps import OlaMaps
 
@@ -22,6 +23,43 @@ router = APIRouter()
 
 
 OLA_MAPS_API_KEY = os.getenv("OLA_MAPS_API_KEY")
+
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Straight-line distance between two lat/lon points in km."""
+    R = 6371.0
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+    return R * 2 * math.asin(math.sqrt(a))
+
+
+def _estimate_from_haversine(origin_coords: dict, dest_coords: dict) -> dict:
+    """
+    Fallback estimate using straight-line distance × road factor.
+    Road factor 1.35 is typical for Indian inter-city routes.
+    Average speed 50 km/h for Indian highways.
+    """
+    straight_km = _haversine_km(
+        origin_coords["lat"], origin_coords["lon"],
+        dest_coords["lat"],   dest_coords["lon"]
+    )
+    road_km     = round(straight_km * 1.35, 1)
+    hours       = round(road_km / 50, 1)
+
+    if hours < 2:
+        summary = f"Close market: ~{hours} hrs (~{road_km} km). Low transit risk."
+    elif hours < 4:
+        summary = f"Moderate distance: ~{hours} hrs (~{road_km} km). Plan early departure."
+    else:
+        summary = f"Long distance: ~{hours} hrs (~{road_km} km). Consider overnight storage."
+
+    return {
+        "transit_hours": max(hours, 1.0),
+        "distance_km":   road_km,
+        "source":        "estimated",
+        "route_summary": summary,
+    }
 
 
 class RecommendRequest(BaseModel):
@@ -52,6 +90,7 @@ class RecommendRequest(BaseModel):
         example=0.0,
         description="Hours to market. Set 0 to auto-calculate via OLA Maps.",
     )
+    language: str = Field(default="en", example="hi", description="ISO language code: en/hi/mr/te/ta/kn")
 
 
 class RecommendResponse(BaseModel):
@@ -93,32 +132,54 @@ def get_transit_time_ola(
 
     try:
         origin_coords = get_coordinates(origin_district, origin_state)
-        dest_coords = get_coordinates(dest_market, dest_state)
+        dest_coords   = get_coordinates(dest_market,     dest_state)
 
         origin_str = f"{origin_coords['lat']},{origin_coords['lon']}"
-        dest_str = f"{dest_coords['lat']},{dest_coords['lon']}"
+        dest_str   = f"{dest_coords['lat']},{dest_coords['lon']}"
+
+        print(f"[Transit] {origin_district} {origin_coords} → {dest_market} {dest_coords}")
+
+        # Haversine baseline — used to sanity-check the OLA Maps result
+        haversine_km = _haversine_km(
+            origin_coords["lat"], origin_coords["lon"],
+            dest_coords["lat"],   dest_coords["lon"]
+        )
+        print(f"[Transit] Haversine straight-line: {round(haversine_km, 1)} km")
 
         client = OlaMaps(api_key=OLA_MAPS_API_KEY)
         result = client.routing.directions(origin_str, dest_str)
 
         routes = result.get("routes", [])
         if not routes:
-            print("OLA Maps returned no routes. Using default transit time.")
-            return default_result
+            print("[Transit] OLA Maps returned no routes. Using Haversine estimate.")
+            return _estimate_from_haversine(origin_coords, dest_coords)
 
         leg = routes[0]["legs"][0]
-        duration_secs = leg.get("duration", 21600)
-        distance_meters = leg.get("distance", 0)
+        duration_raw  = leg.get("duration", 0)
+        distance_raw  = leg.get("distance", 0)
+
+        # OLA Maps may return nested dicts like {"value": X, "text": "..."}
+        duration_secs   = duration_raw["value"]  if isinstance(duration_raw,  dict) else duration_raw
+        distance_meters = distance_raw["value"]  if isinstance(distance_raw,  dict) else distance_raw
 
         transit_hours = round(duration_secs / 3600, 1)
-        distance_km = round(distance_meters / 1000, 1)
+        distance_km   = round(distance_meters / 1000, 1)
 
-        # Same-location or suspiciously small result → local market fallback
+        print(f"[Transit] OLA Maps result: {transit_hours}h, {distance_km} km")
+
+        # Sanity check: a real road distance must be ≥ 70% of the straight-line distance.
+        # If OLA Maps reports less, it has returned a wrong/partial route — use Haversine estimate.
+        if haversine_km > 5 and distance_km < haversine_km * 0.70:
+            print(f"[Transit] OLA Maps distance ({distance_km} km) < 60% of straight-line "
+                  f"({round(haversine_km, 1)} km). Switching to Haversine estimate.")
+            return _estimate_from_haversine(origin_coords, dest_coords)
+
+        # Local / same-location guard
         if transit_hours < 0.5 or distance_km < 2:
             return {
                 "transit_hours": 1.0,
-                "distance_km": distance_km,
-                "source": "ola_maps",
+                "distance_km":   distance_km,
+                "source":        "ola_maps",
                 "route_summary": "Local market: estimated 1 hr travel time.",
             }
 
@@ -131,14 +192,19 @@ def get_transit_time_ola(
 
         return {
             "transit_hours": transit_hours,
-            "distance_km": distance_km,
-            "source": "ola_maps",
+            "distance_km":   distance_km,
+            "source":        "ola_maps",
             "route_summary": summary,
         }
 
     except Exception as e:
-        print(f"OLA Maps error: {e}. Using default transit time.")
-        return default_result
+        print(f"[Transit] Error: {e}. Falling back to Haversine estimate.")
+        try:
+            origin_coords = get_coordinates(origin_district, origin_state)
+            dest_coords   = get_coordinates(dest_market,     dest_state)
+            return _estimate_from_haversine(origin_coords, dest_coords)
+        except Exception:
+            return default_result
 
 
 @router.post("/recommend", response_model=RecommendResponse)
@@ -172,11 +238,13 @@ async def recommend(request: RecommendRequest):
             transit_hours = transit_info["transit_hours"]
         else:
             transit_hours = request.transit_hours
+            # Estimate distance from provided hours (50 km/h avg Indian highway speed)
+            est_distance_km = round(transit_hours * 50, 1)
             transit_info = {
                 "transit_hours": transit_hours,
-                "distance_km": 0,
+                "distance_km": est_distance_km,
                 "source": "farmer_provided",
-                "route_summary": f"Transit time provided: {transit_hours} hours to market",
+                "route_summary": f"Transit time provided: {transit_hours}h (~{est_distance_km} km estimated)",
             }
 
         crop_result = get_crop_insight(
@@ -234,7 +302,7 @@ async def recommend(request: RecommendRequest):
             "soil_moisture": request.moisture,
         }
 
-        recommendation_text = generate_recommendation(llm_context)
+        recommendation_text = generate_recommendation(llm_context, language=request.language)
         explainability = build_explainable_from_context(
             recommendation=recommendation_text,
             context=llm_context,
