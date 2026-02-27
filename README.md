@@ -26,8 +26,11 @@ India's farmers lose up to **40% of produce value** due to poor harvest timing a
 | 🤖 **AI Recommendation** | 4-point plain-language advice from Groq LLM (Llama 3.3 70B) |
 | 🗣️ **Voice Input** | Web Speech API for hands-free crop/location entry in all 6 languages |
 | 🌐 **6 Languages** | English, हिंदी, मराठी, తెలుగు, தமிழ், ಕನ್ನಡ — UI and AI output both localized |
-| 📊 **Price Prediction** | CatBoost ML model trained on Agmarknet mandi data |
+| 📊 **Price Prediction** | CatBoost ML model trained on 880K+ rows of Agmarknet mandi data |
 | 🚚 **Transit Intelligence** | Real routing via OLA Maps with Haversine sanity-check fallback |
+| 📈 **Arrival Surge Prediction** | Detects upcoming high-supply weeks from historical data; shows real date ranges and price impact % so farmers can time their sale before the glut |
+| 🛡️ **Loss Insurance Estimator** | Calculates value-at-risk, expected crop loss, storage upgrade cost, loss saved, and ROI — helps farmers decide if cold storage investment is worth it |
+| 🤝 **Middleman Bypass Score** | Scores 0–10 opportunity to sell direct (FPO / e-NAM / buyer network), estimates commission saved in ₹ |
 
 ---
 
@@ -68,12 +71,13 @@ AgriChain/
 │   ├── app.py                  # FastAPI entry point
 │   ├── routes/
 │   │   ├── recommend.py        # /api/recommend, /api/transit, /api/price
-│   │   └── spoilage.py         # /api/spoilage
+│   │   ├── spoilage.py         # /api/spoilage
+│   │   └── insights.py         # /api/arrival-prediction, /api/loss-risk, /api/bypass-score
 │   ├── services/
 │   │   ├── llm_service.py      # Groq LLM, multilingual system prompt
-│   │   ├── mandi_service.py    # Price prediction + best market
+│   │   ├── mandi_service.py    # Price prediction + best market + arrival surge + bypass score
 │   │   ├── weather_service.py  # OpenWeather, parallel fetch, geocoding
-│   │   ├── crop_service.py     # Spoilage scoring, soil suitability
+│   │   ├── crop_service.py     # Spoilage scoring, soil suitability, loss insurance
 │   │   └── explainability_service.py
 │   ├── models/
 │   │   └── agrichain_price_model.cbm  # Trained CatBoost model
@@ -85,7 +89,7 @@ AgriChain/
 │       └── spoilage_prompt.txt
 ├── frontend/
    └── src/
-       ├── pages/              # HomePage, RecommendPage, ResultsPage, ...
+       ├── pages/              # HomePage, RecommendPage, ResultsPage, SpoilagePage, InsightsPage
        ├── components/         # VoiceInput, SpoilageGauge, BottomNav, ...
        ├── lib/
        │   ├── i18n.ts         # 6-language translations
@@ -158,6 +162,9 @@ LLM_BASE_URL=https://api.groq.com/openai/v1
 | `GET` | `/api/price` | Quick mandi price lookup |
 | `GET` | `/api/crops` | List of supported crops |
 | `GET` | `/api/health` | Health check |
+| `POST` | `/api/arrival-prediction` | Arrival surge prediction — upcoming high-supply weeks + best-sell windows |
+| `POST` | `/api/loss-risk` | Loss insurance — value at risk, expected loss, upgrade ROI |
+| `POST` | `/api/bypass-score` | Middleman bypass score — direct-sell opportunity + commission savings |
 
 ### `POST /api/recommend` — key fields
 ```json
@@ -172,9 +179,40 @@ LLM_BASE_URL=https://api.groq.com/openai/v1
   "language": "hi"
 }
 ```
-Set `transit_hours: 0` to auto-calculate via OLA Maps. Set `language` to `en | hi | mr | te | ta | kn` to get the AI recommendation in that language.
+Set `transit_hours: 0` to auto-calculate via OLA Maps. Set `language` to `en | hi | mr | te | ta | kn`.
+
+### `POST /api/arrival-prediction`
+```json
+{ "crop": "Tomato", "state": "Maharashtra", "date": "2026-03-01" }
+```
+Returns `alert`, `advice`, `upcoming_surges` (with calendar date ranges and price impact %), and `best_price_weeks`.
+
+### `POST /api/loss-risk`
+```json
+{
+  "crop": "Tomato",
+  "quantity_quintals": 10,
+  "predicted_price": 1500,
+  "spoilage_score": 35,
+  "storage_type": "basic_shed"
+}
+```
+Returns `value_at_risk`, `expected_loss`, `upgrade_cost`, `loss_saved`, `roi`, `urgency`, `upgrade_tip`, `summary`.
+
+### `POST /api/bypass-score`
+```json
+{
+  "crop": "Tomato",
+  "state": "Maharashtra",
+  "quantity_quintals": 10,
+  "predicted_price": 1500,
+  "price_trend": "stable"
+}
+```
+Returns `bypass_score` (0–10), `verdict`, `commission_saved` (₹), `commission_rate_pct`, `reasons`, `next_step`.
 
 ---
+
 
 ## Data Sources
 
@@ -193,6 +231,9 @@ Set `transit_hours: 0` to auto-calculate via OLA Maps. Set `language` to `en | h
 - **Multilingual LLM** — system prompt dynamically instructs the model to respond in the selected language; the prompt file avoids any hardcoded language instruction.
 - **Parallel weather fetch** — `ThreadPoolExecutor` fetches current conditions and forecast simultaneously with a 10-minute in-memory cache.
 - **Voice input** uses BCP-47 Indian regional variants (`hi-IN`, `mr-IN`, `te-IN`, `ta-IN`, `kn-IN`) for best accuracy on Indian crop and place names.
+- **Arrival surge detection** scans 880K+ rows of historical mandi data, computes per-week mean arrival volumes, flags weeks with >1.5× average as surges, and maps ISO week numbers to human-readable date ranges.
+- **Loss insurance ROI** compares expected loss at current storage vs loss after upgrade, dividing savings by upgrade cost — if ROI > 1 the upgrade pays for itself this season.
+- **Bypass score** is a 0–10 composite of quantity threshold (FPO min), price trend stability, network density by state, and commission savings relative to crop value.
 
 ---
 
@@ -209,6 +250,9 @@ CatBoost predicts price at local & best market
         ↓
 Groq LLM generates 4-point advice in farmer's language
         ↓
-Farmer knows: when to harvest, where to sell, what price to expect, what to do today
+Insights tab: arrival surge dates · bypass score · loss insurance ROI
+        ↓
+Farmer knows: when to harvest, where to sell, what price to expect,
+             whether to upgrade storage, and if going direct saves money
 ```
 
