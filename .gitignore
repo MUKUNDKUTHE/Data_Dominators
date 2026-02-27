@@ -37,13 +37,13 @@ secrets.json
 
 # .gitignore
 backend/data/raw/*.csv
-backend/data/processed/*.csv
-backend/data/soil/*.csv
-backend/models/*.cbm
+# backend/data/processed/*.csv  ← needed at runtime
+# backend/data/soil/*.csv       ← needed at runtime
+# backend/models/*.cbm  ← kept in git for deployment
+# *.pkl                 ← kept in git for deployment
 
 *.tsv
 *.tfevents
-*.pkl
 __init__.py
 
 /catboost_info
