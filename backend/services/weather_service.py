@@ -1,7 +1,9 @@
 # backend/services/weather_service.py
 
 import os
+import time
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -15,6 +17,14 @@ OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 BASE_URL_CURRENT    = "https://api.openweathermap.org/data/2.5/weather"
 BASE_URL_FORECAST   = "https://api.openweathermap.org/data/2.5/forecast"
 BASE_URL_GEO        = "http://api.openweathermap.org/geo/1.0/direct"
+
+# ─────────────────────────────────────────
+# SIMPLE IN-MEMORY CACHE
+# Avoids repeated API calls for same location
+# TTL = 10 minutes
+# ─────────────────────────────────────────
+_cache: dict = {}
+CACHE_TTL = 600  # seconds
 
 # ─────────────────────────────────────────
 # INDIA STATE → COORDINATES MAP
@@ -211,7 +221,7 @@ def get_current_weather(city: str, state: str) -> dict:
                 "appid": OPENWEATHER_API_KEY,
                 "units": "metric"
             },
-            timeout=10
+            timeout=15
         )
         response.raise_for_status()
         data = response.json()
@@ -268,7 +278,7 @@ def get_weather_forecast(city: str, state: str, days: int = 5) -> dict:
                 "units": "metric",
                 "cnt":   days * 8   # 8 readings per day (every 3hrs)
             },
-            timeout=10
+            timeout=15
         )
         response.raise_for_status()
         data = response.json()
@@ -336,15 +346,34 @@ def get_weather_forecast(city: str, state: str, days: int = 5) -> dict:
 def get_weather_insight(city: str, state: str) -> dict:
     """
     Master function — combines current weather + forecast.
+    Fetches both in parallel and caches results for 10 minutes.
     Called by recommend.py route.
     """
-    current  = get_current_weather(city, state)
-    forecast = get_weather_forecast(city, state)
+    cache_key = f"{city.lower()}|{state.lower()}"
+    now = time.time()
 
-    return {
+    # Return cached result if still fresh
+    if cache_key in _cache:
+        cached_at, cached_data = _cache[cache_key]
+        if now - cached_at < CACHE_TTL:
+            return cached_data
+
+    # Fetch current weather and forecast in parallel
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future_current  = executor.submit(get_current_weather, city, state)
+        future_forecast = executor.submit(get_weather_forecast, city, state)
+
+        current  = future_current.result()
+        forecast = future_forecast.result()
+
+    result = {
         "current":  current,
         "forecast": forecast
     }
+
+    # Cache the result
+    _cache[cache_key] = (now, result)
+    return result
 
 
 # ─────────────────────────────────────────
