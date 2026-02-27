@@ -18,26 +18,48 @@ client = OpenAI(
 
 LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
 
-SYSTEM_PROMPT = """You are AgriChain, an AI assistant helping Indian farmers 
-make better harvest and selling decisions.
-- Always respond in simple, clear English
-- Be direct and specific (use actual dates, prices, market names)
+LANGUAGE_NAMES: dict[str, str] = {
+    "en": "English",
+    "hi": "Hindi",
+    "mr": "Marathi",
+    "te": "Telugu",
+    "ta": "Tamil",
+    "kn": "Kannada",
+}
+
+BASE_RULES = """- Be direct and specific (use actual dates, prices, market names)
 - Always explain WHY you made each recommendation
 - Keep responses concise and under 150 words
 - Never use technical jargon
 - Be encouraging and trustworthy
 - CRITICAL: Use ONLY the EXACT price numbers given to you. NEVER invent, round, or alter any price, distance, or number. Copy them exactly as provided.
-- CRITICAL: Start your response DIRECTLY with '1.' — NO greeting, NO intro sentence, NO preamble. The very first character must be '1'."""
+- CRITICAL: Start your response DIRECTLY with '1.' \u2014 NO greeting, NO intro sentence, NO preamble. The very first character must be '1'."""
+
+
+def _build_system_prompt(language: str = "en") -> str:
+    lang_name = LANGUAGE_NAMES.get(language, "English")
+    if language == "en":
+        lang_rule = "- Always respond in simple, clear English"
+    else:
+        lang_rule = (
+            f"- CRITICAL: You MUST respond entirely in {lang_name}. "
+            f"Every single word of all 4 points must be written in {lang_name} script. "
+            "Do NOT use English except for numbers, proper nouns (place names, crop names), and units."
+        )
+    return f"""You are AgriChain, an AI assistant helping Indian farmers make better harvest and selling decisions.
+{lang_rule}
+{BASE_RULES}"""
 
 
 # ─────────────────────────────────────────
 # FUNCTION 1 — GENERATE RECOMMENDATION
 # Main function called by recommend.py route
 # ─────────────────────────────────────────
-def generate_recommendation(context: dict) -> str:
+def generate_recommendation(context: dict, language: str = "en") -> str:
     """
     Generates plain language harvest + market recommendation.
     Loads prompt from harvest_prompt.txt and fills in context.
+    Responds in the given language (en/hi/mr/te/ta/kn).
     """
     prompt = _build_prompt("harvest_prompt.txt", context)
 
@@ -45,7 +67,7 @@ def generate_recommendation(context: dict) -> str:
         response = client.chat.completions.create(
             model    = LLM_MODEL,
             messages = [
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": _build_system_prompt(language)},
                 {"role": "user",   "content": prompt}
             ],
             temperature = 0.3,

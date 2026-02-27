@@ -24,7 +24,8 @@ type TranslationKeys =
   | 'transit' | 'aiRecommendation' | 'shareWhatsApp' | 'quintals'
   | 'calculateIncome' | 'atLocalMarket' | 'atBestMarket' | 'extraEarning'
   | 'searchCrop' | 'variety' | 'settings' | 'about' | 'recentRecommendations'
-  | 'checkingPrices' | 'analyzingWeather' | 'gettingBestMarket' | 'safe' | 'caution' | 'danger';
+  | 'checkingPrices' | 'analyzingWeather' | 'gettingBestMarket' | 'safe' | 'caution' | 'danger'
+  | 'whenToHarvest' | 'whereToSell' | 'priceOutlook' | 'urgentAction';
 
 const translations: Record<Language, Record<TranslationKeys, string>> = {
   en: {
@@ -100,6 +101,10 @@ const translations: Record<Language, Record<TranslationKeys, string>> = {
     safe: 'Safe',
     caution: 'Caution',
     danger: 'Danger',
+    whenToHarvest: 'When to Harvest',
+    whereToSell: 'Where to Sell',
+    priceOutlook: 'Price Outlook',
+    urgentAction: 'Urgent Action',
   },
   hi: {
     appName: 'AgriChain',
@@ -174,6 +179,10 @@ const translations: Record<Language, Record<TranslationKeys, string>> = {
     safe: 'सुरक्षित',
     caution: 'सावधानी',
     danger: 'खतरा',
+    whenToHarvest: 'कब काटें',
+    whereToSell: 'कहाँ बेचें',
+    priceOutlook: 'भाव अनुमान',
+    urgentAction: 'आज का काम',
   },
   mr: {
     appName: 'AgriChain',
@@ -248,6 +257,10 @@ const translations: Record<Language, Record<TranslationKeys, string>> = {
     safe: 'सुरक्षित',
     caution: 'सावधगिरी',
     danger: 'धोका',
+    whenToHarvest: 'कधी काढणी करावी',
+    whereToSell: 'कुठे विकावे',
+    priceOutlook: 'भाव अंदाज',
+    urgentAction: 'आजचे काम',
   },
   te: {
     appName: 'AgriChain',
@@ -322,6 +335,10 @@ const translations: Record<Language, Record<TranslationKeys, string>> = {
     safe: 'సురక్షితం',
     caution: 'జాగ్రత్త',
     danger: 'ప్రమాదం',
+    whenToHarvest: 'ఎప్పుడు కోయాలి',
+    whereToSell: 'ఎక్కడ అమ్మాలి',
+    priceOutlook: 'ధర అంచనా',
+    urgentAction: 'నేటి పని',
   },
   ta: {
     appName: 'AgriChain',
@@ -396,6 +413,10 @@ const translations: Record<Language, Record<TranslationKeys, string>> = {
     safe: 'பாதுகாப்பு',
     caution: 'எச்சரிக்கை',
     danger: 'ஆபத்து',
+    whenToHarvest: 'எப்போது அறுவடை',
+    whereToSell: 'எங்கு விற்கலாம்',
+    priceOutlook: 'விலை முன்னோக்கு',
+    urgentAction: 'இன்றைய வேலை',
   },
   kn: {
     appName: 'AgriChain',
@@ -470,6 +491,10 @@ const translations: Record<Language, Record<TranslationKeys, string>> = {
     safe: 'ಸುರಕ್ಷಿತ',
     caution: 'ಎಚ್ಚರಿಕೆ',
     danger: 'ಅಪಾಯ',
+    whenToHarvest: 'ಯಾವಾಗ ಕೊಯ್ಯಾಲಿ',
+    whereToSell: 'ಎಲ್ಲಿ ಮಾರಬೇಕು',
+    priceOutlook: 'ಬೆಲೆ ಅಂದಾಜು',
+    urgentAction: 'ಇಂದಿನ ಕೆಲಸ',
   },
 };
 

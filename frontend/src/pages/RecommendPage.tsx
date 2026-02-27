@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { t } from '@/lib/i18n';
+import type { Language } from '@/lib/i18n';
 import { CROPS, INDIAN_STATES, STORAGE_TYPES } from '@/lib/data';
 import { fetchRecommendation, fetchTransit, RecommendRequest } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Sun, Warehouse, Wind, Thermometer, Navigation, MapPin, CheckCircle2, AlertCircle, Info, Loader2 } from 'lucide-react';
+import VoiceInput from '@/components/VoiceInput';
 
 const STORAGE_ICONS: Record<string, React.ElementType> = {
   sun: Sun, warehouse: Warehouse, wind: Wind, thermometer: Thermometer,
@@ -111,6 +113,7 @@ const RecommendPage = () => {
       temperature: 72,
       storage_type: storageType,
       transit_hours: transitHours,
+      language,
     };
 
     try {
@@ -147,7 +150,22 @@ const RecommendPage = () => {
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-card rounded-2xl p-4 mb-4 border border-border shadow-sm">
         <h2 className="text-lg font-bold text-foreground mb-3">{t('yourCrop', language)}</h2>
-        <input type="text" placeholder={t('searchCrop', language)} value={cropSearch} onChange={(e) => setCropSearch(e.target.value)} className="w-full bg-background border border-border rounded-xl px-4 py-3 text-agri-body mb-3 tap-target" />
+        <div className="flex gap-2 mb-3">
+          <div className="relative flex-1">
+            <input type="text" placeholder={t('searchCrop', language)} value={cropSearch} onChange={(e) => setCropSearch(e.target.value)} className="w-full bg-background border border-border rounded-xl px-4 py-3 pr-12 text-agri-body tap-target" />
+            <div className="absolute right-2 top-1/2 -translate-y-1/2">
+              <VoiceInput
+                language={language as Language}
+                label="Speak crop name"
+                onResult={(text) => {
+                  setCropSearch(text);
+                  const match = CROPS.find((c) => c.name.toLowerCase() === text.toLowerCase().trim());
+                  if (match) setSelectedCrop(match.name);
+                }}
+              />
+            </div>
+          </div>
+        </div>
         <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto mb-3">
           {filteredCrops.slice(0, 16).map((crop) => (
             <button key={crop.name} onClick={() => setSelectedCrop(crop.name)} className={`flex flex-col items-center p-2 rounded-xl btn-press tap-target transition-all ${selectedCrop === crop.name ? 'bg-primary/10 border-2 border-primary scale-105' : 'bg-background border border-border'}`}>
@@ -172,8 +190,22 @@ const RecommendPage = () => {
           <option value="">{t('state', language)}</option>
           {INDIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
-        <input type="text" placeholder={t('district', language)} value={district} onChange={(e) => setDistrict(e.target.value)} className="w-full bg-background border border-border rounded-xl px-4 py-3 text-agri-body mb-3 tap-target" />
-        <input type="text" placeholder={t('bestMarket', language) + ' (' + t('optional', language) + ')'} value={market} onChange={(e) => setMarket(e.target.value)} className="w-full bg-background border border-border rounded-xl px-4 py-3 text-agri-body tap-target" />
+        <div className="flex gap-2 mb-3">
+          <div className="relative flex-1">
+            <input type="text" placeholder={t('district', language)} value={district} onChange={(e) => setDistrict(e.target.value)} className="w-full bg-background border border-border rounded-xl px-4 py-3 pr-12 text-agri-body tap-target" />
+            <div className="absolute right-2 top-1/2 -translate-y-1/2">
+              <VoiceInput language={language as Language} label="Speak district" onResult={setDistrict} />
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <input type="text" placeholder={t('bestMarket', language) + ' (' + t('optional', language) + ')'} value={market} onChange={(e) => setMarket(e.target.value)} className="w-full bg-background border border-border rounded-xl px-4 py-3 pr-12 text-agri-body tap-target" />
+            <div className="absolute right-2 top-1/2 -translate-y-1/2">
+              <VoiceInput language={language as Language} label="Speak market" onResult={setMarket} />
+            </div>
+          </div>
+        </div>
       </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-card rounded-2xl p-4 mb-4 border border-border shadow-sm">

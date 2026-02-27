@@ -3,9 +3,10 @@ import { t, formatINR } from '@/lib/i18n';
 import { motion } from 'framer-motion';
 import SpoilageGauge from '@/components/SpoilageGauge';
 import AnimatedCounter from '@/components/AnimatedCounter';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarCheck, MapPin, TrendingUp, Zap, Thermometer, Droplets, Truck, Route, Info } from 'lucide-react';
+import { CalendarCheck, MapPin, TrendingUp, Zap, Thermometer, Droplets, Truck, Route, Loader2 } from 'lucide-react';
+import { fetchRecommendation } from '@/lib/api';
 
 // Sanitize LLM text — replace all mojibake variants of ₹ with "Rs."
 function sanitize(text: string): string {
@@ -29,10 +30,10 @@ function parseRecommendation(text: string): string[] {
 }
 
 const POINT_META = [
-  { Icon: CalendarCheck, label: 'When to Harvest', color: 'text-blue-300' },
-  { Icon: MapPin,        label: 'Where to Sell',   color: 'text-emerald-300' },
-  { Icon: TrendingUp,   label: 'Price Outlook',    color: 'text-yellow-300' },
-  { Icon: Zap,          label: 'Urgent Action',    color: 'text-orange-300' },
+  { Icon: CalendarCheck, labelKey: 'whenToHarvest' as const, color: 'text-blue-300' },
+  { Icon: MapPin,        labelKey: 'whereToSell'   as const, color: 'text-emerald-300' },
+  { Icon: TrendingUp,   labelKey: 'priceOutlook'   as const, color: 'text-yellow-300' },
+  { Icon: Zap,          labelKey: 'urgentAction'   as const, color: 'text-orange-300' },
 ];
 
 const ResultsPage = () => {
@@ -41,7 +42,10 @@ const ResultsPage = () => {
   const [result, setResult] = useState<any>(null);
   const [request, setRequest] = useState<any>(null);
   const [quintals, setQuintals] = useState(10);
+  const [isRefetching, setIsRefetching] = useState(false);
+  const initialMount = useRef(true);
 
+  // Load initial result + request from localStorage
   useEffect(() => {
     const r = localStorage.getItem('agrichain-last-result');
     const req = localStorage.getItem('agrichain-last-request');
@@ -50,7 +54,36 @@ const ResultsPage = () => {
     if (!r) navigate('/recommend');
   }, [navigate]);
 
+  // Re-fetch recommendation in the new language whenever language changes
+  useEffect(() => {
+    if (initialMount.current) {
+      initialMount.current = false;
+      return;
+    }
+    const req = localStorage.getItem('agrichain-last-request');
+    if (!req) return;
+    const parsedReq = { ...JSON.parse(req), language };
+    setIsRefetching(true);
+    fetchRecommendation(parsedReq)
+      .then((newResult: any) => {
+        setResult(newResult);
+        localStorage.setItem('agrichain-last-result', JSON.stringify(newResult));
+        localStorage.setItem('agrichain-last-request', JSON.stringify(parsedReq));
+      })
+      .catch(() => { /* keep existing result on error */ })
+      .finally(() => setIsRefetching(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [language]);
+
   if (!result) return null;
+
+  // Refetching overlay
+  const refetchingOverlay = isRefetching ? (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
+      <Loader2 size={40} className="animate-spin text-primary mb-3" />
+      <p className="text-foreground font-semibold">{t('loading', language)}</p>
+    </div>
+  ) : null;
 
   const pp = result.price_prediction || {};
   const bm = result.best_markets || {};
@@ -70,6 +103,7 @@ const ResultsPage = () => {
 
   return (
     <div className="pb-32 px-4 pt-16 max-w-lg mx-auto space-y-4">
+      {refetchingOverlay}
       <motion.div {...cardAnim(0)} className="gradient-hero rounded-2xl p-5 shadow-lg">
         <p className="text-sm text-primary-foreground/70 mb-3 font-semibold tracking-wide uppercase">{t('aiRecommendation', language)}</p>
         {(() => {
@@ -82,7 +116,7 @@ const ResultsPage = () => {
                   <div key={i} className="flex gap-3 bg-white/10 rounded-xl p-3 items-start">
                     {meta && <meta.Icon size={18} className={`flex-shrink-0 mt-0.5 ${meta.color}`} strokeWidth={2} />}
                     <div>
-                      <p className="text-xs text-primary-foreground/60 font-semibold uppercase tracking-wide mb-0.5">{meta?.label ?? ''}</p>
+                      <p className="text-xs text-primary-foreground/60 font-semibold uppercase tracking-wide mb-0.5">{meta ? t(meta.labelKey, language) : ''}</p>
                       <p className="text-primary-foreground text-sm leading-relaxed">{point.replace(/^\d+\.\s*/, '')}</p>
                     </div>
                   </div>

@@ -19,6 +19,7 @@ export interface RecommendRequest {
   temperature: number;
   storage_type: string;
   transit_hours: number;
+  language: string;
 }
 
 export interface SpoilageRequest {

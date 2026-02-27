@@ -33,7 +33,7 @@ Based on ALL of the above, give the farmer exactly 4 numbered points:
 
 Rules:
 - Start DIRECTLY with "1." — NO greeting, NO intro sentence before point 1
-- Use simple English, no technical jargon
+- Use simple language with no technical jargon (follow the language instruction from the system prompt)
 - Be specific — use actual dates, prices, market names from the data above
 - Always explain WHY after each point
 - If spoilage risk is Medium or High, always mention it in point 4
