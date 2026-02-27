@@ -1,19 +1,25 @@
-# Core libraries for RAG (Retrieval-Augmented Generation) projects
-numpy
-pandas
-scikit-learn
-scipy
-matplotlib
-seaborn
-jupyter
-flask
-flask-cors
-openai
-requests
-pandas
-python-dotenv
-gunicorn
-#For web APIs or serving
-fastapi
-uvicorn
-catboost    
+# AgriChain Backend Requirements
+
+# API
+fastapi==0.111.0
+uvicorn==0.30.1
+pydantic==2.7.1
+python-multipart==0.0.9
+
+# ML Models
+catboost==1.2.5
+scikit-learn==1.5.0
+pandas==2.2.2
+numpy==1.26.4
+
+# LLM
+openai>=1.0.0
+
+# Weather
+requests==2.32.3
+
+# OLA Maps for transit routing
+py-olamaps
+
+# Environment
+python-dotenv==1.0.1
