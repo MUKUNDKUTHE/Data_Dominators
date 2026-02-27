@@ -13,7 +13,7 @@ import SpoilagePage from "@/pages/SpoilagePage";
 import MarketsPage from "@/pages/MarketsPage";
 import ProfilePage from "@/pages/ProfilePage";
 import NotFound from "@/pages/NotFound";
-
+import InsightsPage from '@/pages/InsightsPage';
 const queryClient = new QueryClient();
 
 const AppContent = () => {
@@ -33,6 +33,7 @@ const AppContent = () => {
         <Route path="/spoilage" element={<SpoilagePage />} />
         <Route path="/markets" element={<MarketsPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/insights" element={<InsightsPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

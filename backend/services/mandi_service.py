@@ -267,6 +267,210 @@ def get_mandi_insight(
 
 
 # ─────────────────────────────────────────
+# FUNCTION 5 — ARRIVAL SURGE PREDICTION
+# Uses historical weekly arrival volume to warn
+# farmers when competing supply will flood market
+# ─────────────────────────────────────────
+def get_arrival_surge_prediction(
+    commodity: str,
+    state:     str,
+    target_date: str = None
+) -> dict:
+    """
+    Predicts weeks with historically high arrival volume for a crop+state.
+    Returns alert if the next few weeks are surge weeks → price crash risk.
+    """
+    commodity = commodity.strip().title()
+    state     = state.strip().title()
+
+    filtered = df_mandi[
+        (df_mandi["Commodity"] == commodity) &
+        (df_mandi["State"]     == state)
+    ].copy()
+
+    if len(filtered) < 50:
+        return {
+            "has_prediction": False,
+            "commodity": commodity,
+            "state": state,
+            "alert": f"Not enough historical data for {commodity} in {state}",
+            "advice": "no_data",
+            "upcoming_surges": [],
+            "best_price_weeks": []
+        }
+
+    filtered["week_of_year"] = filtered["Arrival_Date"].dt.isocalendar().week.astype(int)
+
+    weekly = (
+        filtered.groupby("week_of_year")
+        .agg(arrival_count=("Arrival_Date", "count"), avg_price=("Modal_Price", "mean"))
+        .reset_index()
+    )
+
+    overall_avg     = weekly["arrival_count"].mean()
+    surge_threshold = overall_avg * 1.5
+    normal_price    = weekly["avg_price"].mean()
+
+    # Current week
+    try:
+        target_dt = pd.to_datetime(target_date) if target_date else pd.Timestamp.now()
+    except Exception:
+        target_dt = pd.Timestamp.now()
+    current_week = int(target_dt.isocalendar()[1])
+
+    # Upcoming 4 weeks — check for surges
+    upcoming_surges = []
+    for delta in range(0, 5):
+        w     = ((current_week + delta - 1) % 52) + 1
+        match = weekly[weekly["week_of_year"] == w]
+        if not match.empty:
+            row = match.iloc[0]
+            if row["arrival_count"] >= surge_threshold:
+                price_drop = round(((row["avg_price"] - normal_price) / normal_price) * 100, 1)
+                upcoming_surges.append({
+                    "week":             w,
+                    "weeks_from_now":   delta,
+                    "arrival_index":    round(row["arrival_count"] / overall_avg, 2),
+                    "avg_price":        round(row["avg_price"], 0),
+                    "price_impact_pct": price_drop
+                })
+
+    # Historical top-5 surge weeks (for chart)
+    surge_rows = weekly[weekly["arrival_count"] >= surge_threshold].nlargest(5, "arrival_count")
+    historical_surges = []
+    for _, row in surge_rows.iterrows():
+        price_drop = round(((row["avg_price"] - normal_price) / normal_price) * 100, 1)
+        historical_surges.append({
+            "week":             int(row["week_of_year"]),
+            "arrival_index":    round(row["arrival_count"] / overall_avg, 2),
+            "avg_price":        round(row["avg_price"], 0),
+            "price_impact_pct": price_drop
+        })
+
+    # Best weeks to sell (high price, low arrivals)
+    best_weeks = weekly.nlargest(3, "avg_price")["week_of_year"].tolist()
+
+    if upcoming_surges:
+        ns = upcoming_surges[0]
+        if ns["weeks_from_now"] == 0:
+            alert  = (f"⚠️ THIS WEEK is historically a high-arrival surge week for {commodity} in {state}. "
+                      f"Price is {abs(ns['price_impact_pct'])}% {'below' if ns['price_impact_pct'] < 0 else 'near'} average. "
+                      f"Consider selling NOW before further drop or wait until surge passes.")
+            advice = "sell_now_or_delay"
+        else:
+            alert  = (f"⚠️ Arrival surge expected in {ns['weeks_from_now']} week(s) (week {ns['week']}) "
+                      f"for {commodity} in {state}. Prices historically "
+                      f"{abs(ns['price_impact_pct'])}% {'lower' if ns['price_impact_pct'] < 0 else 'normal'} then. "
+                      f"Sell BEFORE the surge for better price.")
+            advice = "sell_before_surge"
+    else:
+        alert  = (f"✅ No arrival surge in the next 4 weeks for {commodity} in {state}. "
+                  f"You are in a safe selling window.")
+        advice = "good_window"
+
+    return {
+        "has_prediction":      True,
+        "commodity":           commodity,
+        "state":               state,
+        "current_week":        current_week,
+        "normal_avg_price":    round(normal_price, 0),
+        "alert":               alert,
+        "advice":              advice,
+        "upcoming_surges":     upcoming_surges,
+        "historical_surges":   historical_surges,
+        "best_price_weeks":    [int(w) for w in best_weeks]
+    }
+
+
+# ─────────────────────────────────────────
+# FUNCTION 6 — MIDDLEMAN BYPASS SCORE
+# Tells farmer when it makes financial sense
+# to sell directly and skip the Arthiya
+# ─────────────────────────────────────────
+def get_bypass_score(
+    crop:              str,
+    state:             str,
+    quantity_quintals: float,
+    predicted_price:   float,
+    price_trend:       str = "stable"
+) -> dict:
+    score   = 0
+    reasons = []
+
+    # ── Quantity ──
+    if quantity_quintals >= 20:
+        score += 3
+        reasons.append({"positive": True,  "text": f"Your {quantity_quintals} qtl meets direct buyer minimum (20 qtl)"})
+    elif quantity_quintals >= 10:
+        score += 2
+        reasons.append({"positive": True,  "text": f"Your {quantity_quintals} qtl qualifies for most direct buyers (min 10 qtl)"})
+    elif quantity_quintals >= 5:
+        score += 1
+        reasons.append({"positive": True,  "text": f"{quantity_quintals} qtl may qualify for some direct buyers"})
+    else:
+        reasons.append({"positive": False, "text": f"Only {quantity_quintals} qtl — too small for direct deals (need 10+ qtl)"})
+
+    # ── Price trend ──
+    if price_trend == "rising":
+        score += 2
+        reasons.append({"positive": True, "text": "Rising prices strengthen your negotiating position"})
+    elif price_trend == "falling":
+        score += 1
+        reasons.append({"positive": True, "text": "Falling prices mean broker's 8% cut hurts more — bypass saves more now"})
+    else:
+        score += 1
+        reasons.append({"positive": True, "text": "Stable prices make direct deal planning straightforward"})
+
+    # ── Commission savings ──
+    commission_rate  = 0.08
+    commission_saved = round(quantity_quintals * predicted_price * commission_rate, 0)
+    if commission_saved > 5000:
+        score += 3
+        reasons.append({"positive": True, "text": f"Savings of ₹{commission_saved:,.0f} by skipping 8% broker commission"})
+    elif commission_saved > 2000:
+        score += 2
+        reasons.append({"positive": True, "text": f"Savings of ₹{commission_saved:,.0f} by skipping broker commission"})
+    else:
+        score += 1
+        reasons.append({"positive": True, "text": f"Savings of ₹{commission_saved:,.0f} by going direct"})
+
+    # ── State has direct buyer networks ──
+    large_apmc = ["maharashtra", "gujarat", "punjab", "haryana",
+                  "andhra pradesh", "telangana", "karnataka", "uttar pradesh"]
+    if state.lower() in large_apmc:
+        score += 2
+        reasons.append({"positive": True, "text": f"{state} has established FPO/direct agri-buyer networks"})
+    else:
+        reasons.append({"positive": False, "text": "Direct buyer network less developed in this state"})
+
+    score = min(score, 10)
+
+    if score >= 8:
+        verdict   = "Highly Recommended"
+        color     = "green"
+        next_step = "Contact your nearest FPO (Farmer Producer Organisation) or APMC direct procurement desk"
+    elif score >= 5:
+        verdict   = "Worth Trying"
+        color     = "yellow"
+        next_step = "Search 'FPO {state}' or call Kisan Call Centre 1800-180-1551 for direct buyer referrals".format(state=state)
+    else:
+        verdict   = "Build Quantity First"
+        color     = "red"
+        next_step = "Combine with 2-3 neighbouring farmers to reach 10+ qtl, then try direct selling"
+
+    return {
+        "bypass_score":       score,
+        "max_score":          10,
+        "verdict":            verdict,
+        "color":              color,
+        "commission_saved":   commission_saved,
+        "commission_rate_pct": commission_rate * 100,
+        "reasons":            reasons,
+        "next_step":          next_step
+    }
+
+
+# ─────────────────────────────────────────
 # QUICK TEST — python mandi_service.py
 # ─────────────────────────────────────────
 if __name__ == "__main__":

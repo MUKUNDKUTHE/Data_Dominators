@@ -336,6 +336,73 @@ def _get_preservation_actions(crop, risk_level, storage_type,
 
 
 
+# ─────────────────────────────────────────
+# FUNCTION 5 — LOSS INSURANCE ESTIMATOR
+# Financial risk layer on top of spoilage score
+# Tells farmer EXACTLY how much money they lose by NOT upgrading
+# ─────────────────────────────────────────
+
+STORAGE_UPGRADE = {
+    "open_air":    {"next": "basic_shed",    "next_label": "Basic Shed",    "upgrade_cost": 50,   "risk_reduction": 0.50},
+    "basic_shed":  {"next": "cool_storage",  "next_label": "Cool Storage",  "upgrade_cost": 300,  "risk_reduction": 0.55},
+    "cool_storage":{"next": "cold_storage",  "next_label": "Cold Storage",  "upgrade_cost": 2000, "risk_reduction": 0.65},
+    "cold_storage":{"next": None,            "next_label": None,            "upgrade_cost": 0,    "risk_reduction": 0.0},
+}
+
+
+def calculate_loss_risk(
+    crop:              str,
+    quantity_quintals: float,
+    predicted_price:   float,
+    spoilage_score:    int,
+    storage_type:      str = "basic_shed"
+) -> dict:
+    """
+    Given spoilage risk and quantity, estimates the financial loss in rupees
+    and calculates ROI of upgrading storage.
+    """
+    loss_probability = spoilage_score / 100
+    value_at_risk    = round(quantity_quintals * predicted_price, 0)
+    expected_loss    = round(value_at_risk * loss_probability * 0.4, 0)
+
+    upgrade      = STORAGE_UPGRADE.get(storage_type, STORAGE_UPGRADE["basic_shed"])
+    upgrade_cost = upgrade["upgrade_cost"]
+    loss_saved   = round(expected_loss * upgrade["risk_reduction"], 0)
+    roi          = round(loss_saved / upgrade_cost, 1) if upgrade_cost > 0 else 0
+
+    if upgrade["next_label"]:
+        upgrade_tip = (
+            f"Upgrade to {upgrade['next_label']} for ₹{upgrade_cost} "
+            f"→ save ₹{loss_saved:,.0f} in losses (ROI: {roi}x)"
+        )
+    else:
+        upgrade_tip = "You're already using the best storage. Focus on transit speed."
+
+    urgency = (
+        "critical" if expected_loss > 10000 else
+        "high"     if expected_loss > 3000  else
+        "medium"   if expected_loss > 1000  else
+        "low"
+    )
+
+    return {
+        "quantity_quintals":    quantity_quintals,
+        "predicted_price":      predicted_price,
+        "value_at_risk":        value_at_risk,
+        "loss_probability_pct": round(loss_probability * 100, 1),
+        "expected_loss":        expected_loss,
+        "upgrade_cost":         upgrade_cost,
+        "loss_saved":           loss_saved,
+        "roi":                  roi,
+        "urgency":              urgency,
+        "upgrade_tip":          upgrade_tip,
+        "summary":              (
+            f"On {quantity_quintals} qtl of {crop} worth ₹{value_at_risk:,.0f}, "
+            f"you risk losing ₹{expected_loss:,.0f}"
+        )
+    }
+
+
 # FUNCTION 4 — MASTER FUNCTION
 # Called by recommend.py route
 

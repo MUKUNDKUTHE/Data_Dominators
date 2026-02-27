@@ -209,5 +209,73 @@ def _fallback_spoilage(context: dict) -> str:
         f"{risk} spoilage risk for {crop} (score: {score}/100). "
         f"Actions: 1) Sort damaged produce (Free) "
         f"2) Move to shade (Free) "
-        f"3) Use jute sacks (₹5-10/bag)"
+        f"3) Use jute sacks (Rs.5-10/bag)"
     )
+
+
+# ─────────────────────────────────────────
+# FUNCTION 3 — PHOTO CROP GRADING
+# Uses Groq vision model to grade produce quality
+# against AGMARK standards from a photo
+# ─────────────────────────────────────────
+def grade_crop_from_image(base64_image: str, crop: str) -> dict:
+    """
+    Grades crop quality from a base64-encoded photo.
+    Uses llama-3.2-11b-vision-preview via Groq.
+    Returns AGMARK grade (A/B/C) with actionable tips.
+    """
+    import json
+
+    prompt_text = (
+        f"You are an expert Indian agricultural produce grader following AGMARK standards.\n\n"
+        f"Grade this {crop} image. Respond in EXACTLY this JSON format (no extra text, no markdown):\n"
+        "{\"grade\": \"A\", \"confidence\": 85, \"color_uniformity\": \"Good\", "
+        "\"size_consistency\": \"Moderate\", \"surface_defects\": \"None visible\", "
+        "\"bruising\": \"Minor bruising on 2-3 pieces\", "
+        "\"short_reason\": \"Mostly uniform color with minor marks\", "
+        "\"actionable_tip\": \"Remove damaged pieces. Rest qualifies Grade A.\", "
+        "\"price_premium_pct\": 15}\n\n"
+        "Rules:\n"
+        "- grade: A (<5% defects), B (5-20% defects), C (>20% defects)\n"
+        "- confidence: 0-100\n"
+        "- price_premium_pct: extra % farmer gains by sorting to Grade A (0 if already A)\n"
+        "- short_reason: max 15 words\n"
+        "- actionable_tip: max 20 words, specific action farmer can do RIGHT NOW"
+    )
+
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.2-11b-vision-preview",
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
+                    },
+                    {"type": "text", "text": prompt_text}
+                ]
+            }],
+            temperature=0.1,
+            max_tokens=250
+        )
+        text = response.choices[0].message.content.strip()
+        # Extract JSON block
+        if "{" in text:
+            text = text[text.index("{"):text.rindex("}")+1]
+        result            = json.loads(text)
+        result["crop"]    = crop
+        result["success"] = True
+        return result
+
+    except Exception as e:
+        return {
+            "success":          False,
+            "crop":             crop,
+            "grade":            "B",
+            "confidence":       0,
+            "short_reason":     "Image analysis failed",
+            "actionable_tip":   "Ensure good lighting and photo clarity, then retry",
+            "price_premium_pct": 10,
+            "error":            str(e)
+        }

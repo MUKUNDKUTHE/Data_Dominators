@@ -2,14 +2,14 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { t } from '@/lib/i18n';
 import { LANGUAGES } from '@/lib/i18n';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Home, Sparkles, BarChart2, ShieldAlert, User } from 'lucide-react';
+import { Home, Sparkles, BarChart2, ShieldAlert, TrendingUp } from 'lucide-react';
 
 const tabs = [
-  { key: 'home' as const, Icon: Home, path: '/' },
-  { key: 'recommend' as const, Icon: Sparkles, path: '/recommend' },
-  { key: 'markets' as const, Icon: BarChart2, path: '/markets' },
-  { key: 'spoilage' as const, Icon: ShieldAlert, path: '/spoilage' },
-  { key: 'profile' as const, Icon: User, path: '/profile' },
+  { key: 'home'      as const, Icon: Home,        path: '/' },
+  { key: 'recommend' as const, Icon: Sparkles,    path: '/recommend' },
+  { key: 'markets'   as const, Icon: BarChart2,   path: '/markets' },
+  { key: 'spoilage'  as const, Icon: ShieldAlert, path: '/spoilage' },
+  { key: 'insights'  as const, Icon: TrendingUp,  path: '/insights' },
 ];
 
 const BottomNav = () => {

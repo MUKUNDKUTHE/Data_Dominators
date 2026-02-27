@@ -102,3 +102,48 @@ export async function fetchTransit(origin: string, state: string, dest: string):
   const query = new URLSearchParams({ origin, state, dest });
   return request<TransitResponse>(`/api/transit?${query.toString()}`);
 }
+
+// ─── New insight endpoints ───────────────────────────────────────────
+
+export interface ArrivalPredictionRequest {
+  crop:  string;
+  state: string;
+  date?: string;
+}
+
+export interface LossRiskRequest {
+  crop:              string;
+  quantity_quintals: number;
+  predicted_price:   number;
+  spoilage_score:    number;
+  storage_type:      string;
+}
+
+export interface BypassScoreRequest {
+  crop:              string;
+  state:             string;
+  quantity_quintals: number;
+  predicted_price:   number;
+  price_trend:       string;
+}
+
+export interface GradeRequest {
+  crop:         string;
+  image_base64: string;
+}
+
+export async function fetchArrivalPrediction(data: ArrivalPredictionRequest) {
+  return request('/api/arrival-prediction', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function fetchLossRisk(data: LossRiskRequest) {
+  return request('/api/loss-risk', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function fetchBypassScore(data: BypassScoreRequest) {
+  return request('/api/bypass-score', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function fetchGradeCrop(data: GradeRequest) {
+  return request('/api/grade-crop', { method: 'POST', body: JSON.stringify(data) });
+}

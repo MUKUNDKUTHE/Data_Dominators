@@ -25,7 +25,8 @@ type TranslationKeys =
   | 'calculateIncome' | 'atLocalMarket' | 'atBestMarket' | 'extraEarning'
   | 'searchCrop' | 'variety' | 'settings' | 'about' | 'recentRecommendations'
   | 'checkingPrices' | 'analyzingWeather' | 'gettingBestMarket' | 'safe' | 'caution' | 'danger'
-  | 'whenToHarvest' | 'whereToSell' | 'priceOutlook' | 'urgentAction';
+  | 'whenToHarvest' | 'whereToSell' | 'priceOutlook' | 'urgentAction'
+  | 'insights';
 
 const translations: Record<Language, Record<TranslationKeys, string>> = {
   en: {
@@ -105,6 +106,7 @@ const translations: Record<Language, Record<TranslationKeys, string>> = {
     whereToSell: 'Where to Sell',
     priceOutlook: 'Price Outlook',
     urgentAction: 'Urgent Action',
+    insights: 'Insights',
   },
   hi: {
     appName: 'AgriChain',
@@ -183,6 +185,7 @@ const translations: Record<Language, Record<TranslationKeys, string>> = {
     whereToSell: 'कहाँ बेचें',
     priceOutlook: 'भाव अनुमान',
     urgentAction: 'आज का काम',
+    insights: 'जानकारी',
   },
   mr: {
     appName: 'AgriChain',
@@ -261,6 +264,7 @@ const translations: Record<Language, Record<TranslationKeys, string>> = {
     whereToSell: 'कुठे विकावे',
     priceOutlook: 'भाव अंदाज',
     urgentAction: 'आजचे काम',
+    insights: 'माहिती',
   },
   te: {
     appName: 'AgriChain',
@@ -339,6 +343,7 @@ const translations: Record<Language, Record<TranslationKeys, string>> = {
     whereToSell: 'ఎక్కడ అమ్మాలి',
     priceOutlook: 'ధర అంచనా',
     urgentAction: 'నేటి పని',
+    insights: 'అంతర్దృష్టి',
   },
   ta: {
     appName: 'AgriChain',
@@ -417,6 +422,7 @@ const translations: Record<Language, Record<TranslationKeys, string>> = {
     whereToSell: 'எங்கு விற்கலாம்',
     priceOutlook: 'விலை முன்னோக்கு',
     urgentAction: 'இன்றைய வேலை',
+    insights: 'நுண்ணறிவு',
   },
   kn: {
     appName: 'AgriChain',
@@ -495,6 +501,7 @@ const translations: Record<Language, Record<TranslationKeys, string>> = {
     whereToSell: 'ಎಲ್ಲಿ ಮಾರಬೇಕು',
     priceOutlook: 'ಬೆಲೆ ಅಂದಾಜು',
     urgentAction: 'ಇಂದಿನ ಕೆಲಸ',
+    insights: 'ಒಳನೋಟ',
   },
 };
 

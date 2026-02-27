@@ -4,7 +4,8 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes.recommend import router as recommend_router
-from routes.spoilage import router as spoilage_router
+from routes.spoilage  import router as spoilage_router
+from routes.insights  import router as insights_router
 
 
 # APP SETUP
@@ -31,6 +32,7 @@ app.add_middleware(
 
 app.include_router(recommend_router, prefix="/api")
 app.include_router(spoilage_router,  prefix="/api")
+app.include_router(insights_router,  prefix="/api")
 
 
 

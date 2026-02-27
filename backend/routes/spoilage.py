@@ -9,7 +9,7 @@ import sys, os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from services.crop_service    import get_spoilage_risk, get_micronutrient_warnings
+from services.crop_service    import get_spoilage_risk, get_micronutrient_warnings, calculate_loss_risk
 from services.weather_service import get_current_weather
 from services.llm_service     import generate_spoilage_advice
 
@@ -20,11 +20,13 @@ router = APIRouter()
 # REQUEST MODEL
 # ─────────────────────────────────────────
 class SpoilageRequest(BaseModel):
-    crop:          str   = Field(...,          example="Tomato")
-    district:      str   = Field(...,          example="Pune")
-    state:         str   = Field(...,          example="Maharashtra")
-    storage_type:  str   = Field(default="basic_shed", example="basic_shed")
-    transit_hours: float = Field(default=6.0,  example=6.0)
+    crop:              str   = Field(...,          example="Tomato")
+    district:          str   = Field(...,          example="Pune")
+    state:             str   = Field(...,          example="Maharashtra")
+    storage_type:      str   = Field(default="basic_shed", example="basic_shed")
+    transit_hours:     float = Field(default=6.0,  example=6.0)
+    quantity_quintals: float = Field(default=10.0, example=10.0)
+    predicted_price:   float = Field(default=None, example=1500.0)
 
     # Optional — if not provided, fetched from OpenWeather
     temperature:   float = Field(default=None, example=30.0)
@@ -83,12 +85,24 @@ async def spoilage(request: SpoilageRequest):
         }
         llm_advice = generate_spoilage_advice(llm_context)
 
+        # ── Financial loss risk (if price provided) ──
+        loss_risk_result = None
+        if request.predicted_price and request.predicted_price > 0:
+            loss_risk_result = calculate_loss_risk(
+                crop               = request.crop,
+                quantity_quintals  = request.quantity_quintals,
+                predicted_price    = request.predicted_price,
+                spoilage_score     = spoilage_result["risk_score"],
+                storage_type       = request.storage_type
+            )
+
         return {
             "success":       True,
             "crop":          request.crop,
             "district":      request.district,
             "spoilage":      spoilage_result,
             "micronutrient": micro_result,
+            "loss_risk":     loss_risk_result,
             "advice":        llm_advice,
             "weather_used":  {
                 "temperature":    temperature,
