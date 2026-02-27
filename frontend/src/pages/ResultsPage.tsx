@@ -5,6 +5,35 @@ import SpoilageGauge from '@/components/SpoilageGauge';
 import AnimatedCounter from '@/components/AnimatedCounter';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { CalendarCheck, MapPin, TrendingUp, Zap, Thermometer, Droplets, Truck, Route, Info } from 'lucide-react';
+
+// Sanitize LLM text — replace all mojibake variants of ₹ with "Rs."
+function sanitize(text: string): string {
+  return text
+    .replace(/â‚¹/g, 'Rs.')   // classic cp1252 mojibake
+    .replace(/â,¹/g, 'Rs.')   // alternate rendering
+    .replace(/â\x82¹/g, 'Rs.') // raw bytes variant
+    .replace(/₹/g, 'Rs.');    // actual symbol → plain ASCII for safety
+}
+
+// Parse "1. text 2. text" style recommendation into array of exactly 4 numbered points.
+// Strips any preamble the LLM adds before point 1.
+function parseRecommendation(text: string): string[] {
+  if (!text) return [];
+  const clean = sanitize(text);
+  const numbered = clean
+    .split(/(?=\d+\.\s)/)
+    .map(s => s.trim())
+    .filter(s => /^\d+\.\s/.test(s));
+  return numbered.length >= 2 ? numbered.slice(0, 4) : [clean];
+}
+
+const POINT_META = [
+  { Icon: CalendarCheck, label: 'When to Harvest', color: 'text-blue-300' },
+  { Icon: MapPin,        label: 'Where to Sell',   color: 'text-emerald-300' },
+  { Icon: TrendingUp,   label: 'Price Outlook',    color: 'text-yellow-300' },
+  { Icon: Zap,          label: 'Urgent Action',    color: 'text-orange-300' },
+];
 
 const ResultsPage = () => {
   const { language } = useLanguage();
@@ -42,8 +71,28 @@ const ResultsPage = () => {
   return (
     <div className="pb-32 px-4 pt-16 max-w-lg mx-auto space-y-4">
       <motion.div {...cardAnim(0)} className="gradient-hero rounded-2xl p-5 shadow-lg">
-        <p className="text-sm text-primary-foreground/70 mb-2">AI {t('aiRecommendation', language)}</p>
-        <p className="text-primary-foreground text-agri-body leading-relaxed">{result.recommendation}</p>
+        <p className="text-sm text-primary-foreground/70 mb-3 font-semibold tracking-wide uppercase">{t('aiRecommendation', language)}</p>
+        {(() => {
+          const points = parseRecommendation(result.recommendation);
+          return points.length > 1 ? (
+            <div className="space-y-2.5">
+              {points.map((point, i) => {
+                const meta = POINT_META[i];
+                return (
+                  <div key={i} className="flex gap-3 bg-white/10 rounded-xl p-3 items-start">
+                    {meta && <meta.Icon size={18} className={`flex-shrink-0 mt-0.5 ${meta.color}`} strokeWidth={2} />}
+                    <div>
+                      <p className="text-xs text-primary-foreground/60 font-semibold uppercase tracking-wide mb-0.5">{meta?.label ?? ''}</p>
+                      <p className="text-primary-foreground text-sm leading-relaxed">{point.replace(/^\d+\.\s*/, '')}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-primary-foreground text-agri-body leading-relaxed">{sanitize(result.recommendation)}</p>
+          );
+        })()}
       </motion.div>
 
       {result.explainability?.top_reasons?.length ? (
@@ -127,8 +176,34 @@ const ResultsPage = () => {
       ) : null}
 
       <motion.div {...cardAnim(6)} className="grid grid-cols-2 gap-3">
-        {result.weather ? <div className="bg-card rounded-2xl p-4 border border-border shadow-sm"><h4 className="font-bold text-foreground text-sm mb-2">{t('weather', language)}</h4><p className="text-2xl font-bold text-foreground">{result.weather.temperature}C</p><p className="text-sm text-muted-foreground">Humidity {result.weather.humidity}%</p><p className="text-sm text-muted-foreground">{result.weather.description}</p></div> : null}
-        {result.transit_info ? <div className="bg-card rounded-2xl p-4 border border-border shadow-sm"><h4 className="font-bold text-foreground text-sm mb-2">{t('transit', language)}</h4><p className="text-2xl font-bold text-foreground">{result.transit_info.transit_hours}h</p><p className="text-sm text-muted-foreground">{result.transit_info.distance_km} km</p><p className="text-sm text-muted-foreground">{result.transit_info.route_summary}</p></div> : null}
+        {result.weather ? (
+          <div className="bg-card rounded-2xl p-4 border border-border shadow-sm">
+            <div className="flex items-center gap-1.5 mb-3">
+              <Thermometer size={15} className="text-primary" />
+              <h4 className="font-bold text-foreground text-sm">{t('weather', language)}</h4>
+            </div>
+            <p className="text-2xl font-bold text-foreground">{result.weather.temperature}°C</p>
+            <div className="flex items-center gap-1 mt-1">
+              <Droplets size={13} className="text-blue-400" />
+              <p className="text-sm text-muted-foreground">Humidity {result.weather.humidity}%</p>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5 capitalize">{result.weather.description}</p>
+          </div>
+        ) : null}
+        {result.transit_info ? (
+          <div className="bg-card rounded-2xl p-4 border border-border shadow-sm">
+            <div className="flex items-center gap-1.5 mb-3">
+              <Truck size={15} className="text-primary" />
+              <h4 className="font-bold text-foreground text-sm">{t('transit', language)}</h4>
+            </div>
+            <p className="text-2xl font-bold text-foreground">{result.transit_info.transit_hours}h</p>
+            <div className="flex items-center gap-1 mt-1">
+              <Route size={13} className="text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">{result.transit_info.distance_km} km</p>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">{result.transit_info.route_summary}</p>
+          </div>
+        ) : null}
       </motion.div>
 
       <div className="fixed bottom-20 left-0 right-0 px-4 z-40"><button onClick={handleShare} className="w-full max-w-lg mx-auto block py-4 rounded-2xl bg-[hsl(142_70%_45%)] text-primary-foreground font-bold text-lg btn-press tap-target shadow-lg">{t('shareWhatsApp', language)}</button></div>
