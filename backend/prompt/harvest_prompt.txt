@@ -7,9 +7,9 @@ Here is the farmer's situation:
 - Best day      : {best_harvest_day}
 
 Market Intelligence:
-- Predicted price at {district}  : ₹{predicted_price}/quintal
+- Predicted price at {district}  : Rs.{predicted_price}/quintal
 - Price trend                    : {price_trend}
-- Best market to sell            : {best_market} (avg ₹{best_market_price}/quintal)
+- Best market to sell            : {best_market} (avg Rs.{best_market_price}/quintal)
 
 Weather:
 - Current conditions             : {weather}
@@ -25,16 +25,16 @@ Post-Harvest:
 - Days safe in storage           : {days_safe} days
 - Top preservation actions       : {preservation_actions}
 
-Based on ALL of the above, give the farmer:
-1. WHEN to harvest (specific date recommendation)
+Based on ALL of the above, give the farmer exactly 4 numbered points:
+1. WHEN to harvest (specific date and why)
 2. WHERE to sell (which market and why)
-3. PRICE expectation (what price to expect)
+3. PRICE expectation (exact price to expect)
 4. ONE urgent action they should take today
 
 Rules:
+- Start DIRECTLY with "1." — NO greeting, NO intro sentence before point 1
 - Use simple English, no technical jargon
-- Be specific — use actual dates, prices, market names
-- Always explain WHY after each recommendation
-- If spoilage risk is Medium or High, always mention it
+- Be specific — use actual dates, prices, market names from the data above
+- Always explain WHY after each point
+- If spoilage risk is Medium or High, always mention it in point 4
 - Keep total response under 150 words
-- Be encouraging and trustworthy

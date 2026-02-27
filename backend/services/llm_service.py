@@ -25,7 +25,9 @@ make better harvest and selling decisions.
 - Always explain WHY you made each recommendation
 - Keep responses concise and under 150 words
 - Never use technical jargon
-- Be encouraging and trustworthy"""
+- Be encouraging and trustworthy
+- CRITICAL: Use ONLY the EXACT price numbers given to you. NEVER invent, round, or alter any price, distance, or number. Copy them exactly as provided.
+- CRITICAL: Start your response DIRECTLY with '1.' — NO greeting, NO intro sentence, NO preamble. The very first character must be '1'."""
 
 
 # ─────────────────────────────────────────
@@ -49,7 +51,10 @@ def generate_recommendation(context: dict) -> str:
             temperature = 0.3,
             max_tokens  = 300
         )
-        return response.choices[0].message.content
+        text = response.choices[0].message.content
+        # Sanitize: replace ₹ symbol with Rs. to avoid encoding issues in transit
+        text = text.replace('\u20b9', 'Rs.').replace('â\x82¹', 'Rs.').replace('â‚¹', 'Rs.')
+        return text
 
     except Exception as e:
         # Fallback — rule-based plain text if LLM fails
@@ -104,7 +109,7 @@ def _build_prompt(filename: str, context: dict) -> str:
     prompt_path  = os.path.join(PROMPTS_DIR, filename)
 
     try:
-        with open(prompt_path, "r") as f:
+        with open(prompt_path, "r", encoding="utf-8") as f:
             template = f.read()
         return template.format(**context)
     except FileNotFoundError:
