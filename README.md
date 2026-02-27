@@ -84,16 +84,16 @@ AgriChain/
 │       ├── harvest_prompt.txt
 │       └── spoilage_prompt.txt
 ├── frontend/
-│   └── src/
-│       ├── pages/              # HomePage, RecommendPage, ResultsPage, ...
-│       ├── components/         # VoiceInput, SpoilageGauge, BottomNav, ...
-│       ├── lib/
-│       │   ├── i18n.ts         # 6-language translations
-│       │   ├── api.ts          # Typed API client
-│       │   └── data.ts         # Crops, states, storage types
-│       └── contexts/
-│           └── LanguageContext.tsx
-└── mobile/                     # Expo WebView wrapper
+   └── src/
+       ├── pages/              # HomePage, RecommendPage, ResultsPage, ...
+       ├── components/         # VoiceInput, SpoilageGauge, BottomNav, ...
+       ├── lib/
+       │   ├── i18n.ts         # 6-language translations
+       │   ├── api.ts          # Typed API client
+       │   └── data.ts         # Crops, states, storage types
+       └── contexts/
+           └── LanguageContext.tsx
+
 ```
 
 ---
