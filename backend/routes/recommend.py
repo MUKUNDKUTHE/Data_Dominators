@@ -5,7 +5,10 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 import sys
 import os
+from dotenv import load_dotenv
 from py_olamaps.OlaMaps import OlaMaps
+
+load_dotenv()
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -110,6 +113,15 @@ def get_transit_time_ola(
         transit_hours = round(duration_secs / 3600, 1)
         distance_km = round(distance_meters / 1000, 1)
 
+        # Same-location or suspiciously small result → local market fallback
+        if transit_hours < 0.5 or distance_km < 2:
+            return {
+                "transit_hours": 1.0,
+                "distance_km": distance_km,
+                "source": "ola_maps",
+                "route_summary": "Local market: estimated 1 hr travel time.",
+            }
+
         if transit_hours < 2:
             summary = f"Close market: {transit_hours} hrs ({distance_km} km). Low transit risk."
         elif transit_hours < 4:
@@ -192,14 +204,20 @@ async def recommend(request: RecommendRequest):
         suitability = crop_result["suitability"]
         spoilage = crop_result["spoilage"]
 
+        def _fmt_price(val) -> str:
+            try:
+                return f"{float(val):,.2f}"
+            except (TypeError, ValueError):
+                return "N/A"
+
         llm_context = {
             "crop": request.crop,
             "state": request.state,
             "district": request.district,
-            "predicted_price": price_data.get("predicted_price", "N/A"),
+            "predicted_price": _fmt_price(price_data.get('predicted_price', 0)),
             "price_trend": f"{trend_data.get('trend', 'stable')} ({trend_data.get('change_pct', 0)}%)",
             "best_market": market_data.get("best_market", request.market),
-            "best_market_price": market_data.get("best_price", "N/A"),
+            "best_market_price": _fmt_price(market_data.get('best_price', 0)),
             "harvest_window": f"Around {request.harvest_date}",
             "best_harvest_day": forecast.get("best_day", request.harvest_date),
             "weather": weather_data.get("weather_summary", "N/A"),
@@ -271,12 +289,23 @@ async def quick_price(
 async def transit(origin: str, state: str, dest: str):
     """Returns transit time between farmer location and market."""
     try:
+        if not dest or dest.strip().lower() == origin.strip().lower():
+            raise HTTPException(
+                status_code=400,
+                detail="Origin and destination cannot be the same. Please provide a different market destination."
+            )
+        print(f"Transit request: origin={origin}, state={state}, dest={dest}")
+        print(f"OLA_MAPS_API_KEY set: {bool(OLA_MAPS_API_KEY)}")
         result = get_transit_time_ola(
             origin_district=origin,
             origin_state=state,
             dest_market=dest,
             dest_state=state,
         )
+        print(f"Transit result: {result}")
         return {"success": True, **result}
     except Exception as e:
+        print(f"Transit error: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

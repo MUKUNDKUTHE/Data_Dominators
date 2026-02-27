@@ -1,10 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { t } from '@/lib/i18n';
 import { CROPS, INDIAN_STATES, STORAGE_TYPES } from '@/lib/data';
-import { fetchRecommendation, RecommendRequest } from '@/lib/api';
+import { fetchRecommendation, fetchTransit, RecommendRequest } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { Sun, Warehouse, Wind, Thermometer, Navigation, MapPin, CheckCircle2, AlertCircle, Info, Loader2 } from 'lucide-react';
+
+const STORAGE_ICONS: Record<string, React.ElementType> = {
+  sun: Sun, warehouse: Warehouse, wind: Wind, thermometer: Thermometer,
+};
 
 const RecommendPage = () => {
   const { language } = useLanguage();
@@ -17,10 +22,67 @@ const RecommendPage = () => {
   const [market, setMarket] = useState('');
   const [storageType, setStorageType] = useState('basic_shed');
   const [transitHours, setTransitHours] = useState(0);
+  const [isLoadingTransit, setIsLoadingTransit] = useState(false);
+  const [transitSource, setTransitSource] = useState<'unset' | 'auto' | 'manual'>('unset');
+  const [transitSummary, setTransitSummary] = useState('');
+  const [transitError, setTransitError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showSoil, setShowSoil] = useState(false);
   const [variety, setVariety] = useState('');
+  const transitDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Auto-calculate transit: only when market is explicitly set and different from district
+  useEffect(() => {
+    const hasDistinctMarket = market.trim().length >= 3 &&
+      market.trim().toLowerCase() !== district.trim().toLowerCase();
+
+    if (!state || !hasDistinctMarket) return;
+    if (transitSource === 'manual') return;
+
+    if (transitDebounceRef.current) clearTimeout(transitDebounceRef.current);
+    transitDebounceRef.current = setTimeout(() => {
+      fetchTransitTime();
+    }, 800);
+
+    return () => {
+      if (transitDebounceRef.current) clearTimeout(transitDebounceRef.current);
+    };
+  }, [state, district, market]);
+
+  // Fetch transit time from OLA Maps API
+  const fetchTransitTime = async () => {
+    if (!state || !district) {
+      setTransitError('Please select state and district first');
+      return;
+    }
+    const destination = market.trim();
+    if (!destination || destination.toLowerCase() === district.trim().toLowerCase()) {
+      setTransitError('');
+      setTransitSummary('');
+      setTransitSource('unset');
+      return;
+    }
+
+    setIsLoadingTransit(true);
+    setTransitError('');
+    setTransitSummary('');
+    try {
+      const result = await fetchTransit(district, state, destination);
+      if (result.success && result.transit_hours !== undefined) {
+        setTransitHours(result.transit_hours);
+        setTransitSource('auto');
+        setTransitSummary(result.route_summary || '');
+      } else {
+        setTransitError('Could not calculate transit time. Use the slider to set manually.');
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch transit time:', err);
+      setTransitError('Auto-calculate failed. Use the slider to set manually.');
+    } finally {
+      setIsLoadingTransit(false);
+    }
+  };
 
   const filteredCrops = CROPS.filter((c) => c.name.toLowerCase().includes(cropSearch.toLowerCase()));
 
@@ -117,16 +179,77 @@ const RecommendPage = () => {
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-card rounded-2xl p-4 mb-4 border border-border shadow-sm">
         <h2 className="text-lg font-bold text-foreground mb-3">{t('storageConditions', language)}</h2>
         <div className="grid grid-cols-2 gap-2 mb-4">
-          {STORAGE_TYPES.map((st) => (
-            <button key={st.id} onClick={() => setStorageType(st.id)} className={`p-3 rounded-xl border-2 btn-press tap-target text-center transition-all ${storageType === st.id ? storageRiskColor(st.risk) + ' scale-105' : 'border-border bg-background'}`}>
-              <span className="text-2xl block">{st.icon}</span>
-              <span className="text-sm font-medium text-foreground">{t(st.id === 'open_air' ? 'openAir' : st.id === 'basic_shed' ? 'basicShed' : st.id === 'cool_storage' ? 'coolRoom' : 'coldStorage', language)}</span>
-            </button>
-          ))}
+          {STORAGE_TYPES.map((st) => {
+            const Icon = STORAGE_ICONS[st.iconKey] ?? Sun;
+            return (
+              <button key={st.id} onClick={() => setStorageType(st.id)} className={`p-3 rounded-xl border-2 btn-press tap-target text-center transition-all ${storageType === st.id ? storageRiskColor(st.risk) + ' scale-105' : 'border-border bg-background'}`}>
+                <Icon size={22} className="mx-auto mb-1 text-primary" strokeWidth={1.8} />
+                <span className="text-sm font-medium text-foreground">{t(st.id === 'open_air' ? 'openAir' : st.id === 'basic_shed' ? 'basicShed' : st.id === 'cool_storage' ? 'coolRoom' : 'coldStorage', language)}</span>
+              </button>
+            );
+          })}
         </div>
         <div>
-          <label className="text-agri-label text-foreground block mb-2">{t('transitHours', language)}: <strong>{transitHours}h</strong></label>
-          <input type="range" min={0} max={24} value={transitHours} onChange={(e) => setTransitHours(Number(e.target.value))} className="w-full accent-primary h-2 tap-target" />
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-agri-label text-foreground">
+              {t('transitHours', language)}:{' '}
+              <strong>
+                {isLoadingTransit
+                  ? '...'
+                  : transitSource === 'unset'
+                  ? 'Not set'
+                  : `${transitHours}h`}
+              </strong>
+              {transitSource === 'auto' && (
+                <span className="ml-2 text-xs text-primary font-medium">✓ Auto</span>
+              )}
+              {transitSource === 'manual' && (
+                <span className="ml-2 text-xs text-muted-foreground">Manual</span>
+              )}
+              {isLoadingTransit && (
+                <span className="ml-2 inline-flex items-center gap-1 text-xs text-muted-foreground"><Loader2 size={11} className="animate-spin" /> Calculating...</span>
+              )}
+            </label>
+            <button
+              onClick={() => { setTransitSource('unset'); fetchTransitTime(); }}
+              disabled={!state || !district || isLoadingTransit}
+              className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-primary bg-primary/10 text-primary font-semibold tap-target disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Navigation size={12} strokeWidth={2} />
+              Auto-Calculate
+            </button>
+          </div>
+          <input
+            type="range"
+            min={1}
+            max={24}
+            value={transitHours || 1}
+            onChange={(e) => {
+              setTransitHours(Number(e.target.value));
+              setTransitSource('manual');
+              setTransitError('');
+              setTransitSummary('');
+            }}
+            className="w-full accent-primary h-2 tap-target"
+          />
+          <div className="flex justify-between text-xs text-muted-foreground mt-1">
+            <span>1h</span><span>12h</span><span>24h</span>
+          </div>
+          {transitSummary && !transitError && (
+            <p className="flex items-start gap-1.5 text-xs text-primary mt-1.5 bg-primary/5 rounded-lg px-2 py-1">
+              <MapPin size={12} className="mt-0.5 flex-shrink-0" />{transitSummary}
+            </p>
+          )}
+          {!transitSummary && !transitError && transitSource === 'unset' && (
+            <p className="flex items-start gap-1.5 text-xs text-muted-foreground mt-1.5 bg-muted/40 rounded-lg px-2 py-1">
+              <Info size={12} className="mt-0.5 flex-shrink-0" />Enter a market destination above to auto-calculate, or the best market will be found automatically.
+            </p>
+          )}
+          {transitError && (
+            <p className="flex items-start gap-1.5 text-xs text-destructive mt-1">
+              <AlertCircle size={12} className="mt-0.5 flex-shrink-0" />{transitError}
+            </p>
+          )}
         </div>
       </motion.div>
 

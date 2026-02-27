@@ -29,6 +29,14 @@ export interface SpoilageRequest {
   district: string;
 }
 
+export interface TransitResponse {
+  success: boolean;
+  transit_hours: number;
+  distance_km: number;
+  source: string;
+  route_summary: string;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
@@ -89,7 +97,7 @@ export async function fetchPrice(params: {
   return request(`/api/price?${query.toString()}`);
 }
 
-export async function fetchTransit(origin: string, state: string, dest: string) {
+export async function fetchTransit(origin: string, state: string, dest: string): Promise<TransitResponse> {
   const query = new URLSearchParams({ origin, state, dest });
-  return request(`/api/transit?${query.toString()}`);
+  return request<TransitResponse>(`/api/transit?${query.toString()}`);
 }
