@@ -41,10 +41,10 @@ export const INDIAN_STATES = [
 ];
 
 export const STORAGE_TYPES = [
-  { id: 'open_air', icon: '🌳', risk: 'high' as const },
-  { id: 'basic_shed', icon: '🏠', risk: 'medium' as const },
-  { id: 'cool_storage', icon: '❄️', risk: 'low' as const },
-  { id: 'cold_storage', icon: '🧊', risk: 'safe' as const },
+  { id: 'open_air',    iconKey: 'sun',          risk: 'high' as const },
+  { id: 'basic_shed',  iconKey: 'warehouse',    risk: 'medium' as const },
+  { id: 'cool_storage',iconKey: 'wind',         risk: 'low' as const },
+  { id: 'cold_storage',iconKey: 'thermometer',  risk: 'safe' as const },
 ];
 
 export const MOCK_PRICES = [

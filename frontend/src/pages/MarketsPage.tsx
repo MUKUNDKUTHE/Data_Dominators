@@ -4,6 +4,7 @@ import { t, formatINR } from '@/lib/i18n';
 import { INDIAN_STATES } from '@/lib/data';
 import { fetchPrice } from '@/lib/api';
 import { motion } from 'framer-motion';
+import { TrendingUp, TrendingDown, Minus, MapPin, BarChart2 } from 'lucide-react';
 
 const MarketsPage = () => {
   const { language } = useLanguage();
@@ -54,10 +55,19 @@ const MarketsPage = () => {
       {result ? (
         <>
           <div className="bg-card rounded-2xl p-4 border border-border shadow-sm mb-3">
-            <p className="text-sm text-muted-foreground">Predicted market price</p>
+            <div className="flex items-center gap-1.5 mb-1">
+              <BarChart2 size={15} className="text-primary" />
+              <p className="text-sm text-muted-foreground font-medium">Predicted market price</p>
+            </div>
             <p className="text-2xl font-bold text-foreground">{formatINR(Number(result.price_prediction?.predicted_price || 0))}</p>
-            <p className="text-sm text-muted-foreground">{result.price_prediction?.market} · {result.price_prediction?.state}</p>
-            <p className="text-sm text-muted-foreground mt-1">Trend: {result.price_trend?.trend} ({result.price_trend?.change_pct}%)</p>
+            <div className="flex items-center gap-1 mt-1">
+              <MapPin size={12} className="text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">{result.price_prediction?.market} Â· {result.price_prediction?.state}</p>
+            </div>
+            <div className="flex items-center gap-1.5 mt-1">
+              {result.price_trend?.trend === 'rising' ? <TrendingUp size={14} className="text-primary" /> : result.price_trend?.trend === 'falling' ? <TrendingDown size={14} className="text-destructive" /> : <Minus size={14} className="text-muted-foreground" />}
+              <p className="text-sm text-muted-foreground">Trend: {result.price_trend?.trend} ({result.price_trend?.change_pct}%)</p>
+            </div>
           </div>
 
           <div className="space-y-2">

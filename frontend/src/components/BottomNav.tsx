@@ -2,13 +2,14 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { t } from '@/lib/i18n';
 import { LANGUAGES } from '@/lib/i18n';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Home, Sparkles, BarChart2, ShieldAlert, User } from 'lucide-react';
 
 const tabs = [
-  { key: 'home' as const, icon: '🏠', path: '/' },
-  { key: 'recommend' as const, icon: '🔍', path: '/recommend' },
-  { key: 'markets' as const, icon: '📊', path: '/markets' },
-  { key: 'spoilage' as const, icon: '⚠️', path: '/spoilage' },
-  { key: 'profile' as const, icon: '👤', path: '/profile' },
+  { key: 'home' as const, Icon: Home, path: '/' },
+  { key: 'recommend' as const, Icon: Sparkles, path: '/recommend' },
+  { key: 'markets' as const, Icon: BarChart2, path: '/markets' },
+  { key: 'spoilage' as const, Icon: ShieldAlert, path: '/spoilage' },
+  { key: 'profile' as const, Icon: User, path: '/profile' },
 ];
 
 const BottomNav = () => {
@@ -49,9 +50,11 @@ const BottomNav = () => {
                 }`}
                 aria-label={t(tab.key, language)}
               >
-                <span className={`text-xl ${isActive ? 'scale-110' : ''} transition-transform`}>
-                  {tab.icon}
-                </span>
+                <tab.Icon
+                  size={22}
+                  strokeWidth={isActive ? 2.2 : 1.8}
+                  className={`transition-transform ${isActive ? 'scale-110' : ''}`}
+                />
                 <span className="text-xs font-medium mt-0.5">{t(tab.key, language)}</span>
               </button>
             );
